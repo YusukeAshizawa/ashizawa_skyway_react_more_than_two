@@ -102,12 +102,12 @@ export const MainContent = () => {
     const me = await room.join();
     setMe(me);
 
-    const dataStream = await SkyWayStreamFactory.createDataStream();
+    // const dataStream = await SkyWayStreamFactory.createDataStream();
 
     // 映像と音声を配信
     await me.publish(localStream.video);
     await me.publish(localStream.audio);
-    await me.publish(dataStream);
+    // await me.publish(dataStream);
 
     // （以下，データ送信方法）
     // // 任意のデータ
