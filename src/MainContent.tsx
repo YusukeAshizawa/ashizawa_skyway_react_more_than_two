@@ -1,6 +1,12 @@
-import { LocalAudioStream, LocalP2PRoomMember, LocalStream, LocalVideoStream, nowInSec, RoomPublication, SkyWayAuthToken, SkyWayContext, SkyWayRoom, SkyWayStreamFactory, uuidV4 } from "@skyway-sdk/room";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { LocalAudioStream, LocalDataStream, LocalP2PRoomMember, LocalStream, LocalVideoStream, nowInSec, RemoteDataStream, RoomPublication, SkyWayAuthToken, SkyWayContext, SkyWayRoom, SkyWayStreamFactory, uuidV4 } from "@skyway-sdk/room";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { RemoteMedia } from "./RemoteMedia";
+import "./MainContent.css"
+
+interface WindowPosition {
+    top: number;
+    left: number;
+}
 
 export const MainContent = () => {
   const appId = useMemo(() => process.env.REACT_APP_SKYWAY_APP_ID, []);
@@ -60,9 +66,16 @@ export const MainContent = () => {
     audio: LocalAudioStream;
     video: LocalVideoStream;
   }>();
+  const [ localDataStream, setLocalDataStream ] = useState<LocalDataStream>();
+  // console.log(localDataStream);
+  // me.subscribe(publication.id) の戻り値に含まれる stream
+  // (contentType === "data" のもの)
+  const [ otherUserDataStream, setOtherUserDataStream ] = useState<RemoteDataStream>();
+  console.log(otherUserDataStream);
 
   // tokenとvideo要素の参照ができたら実行
   useEffect(() => {
+    // ビデオの初期設定
     const initialize = async () => {
       if (token == null || localVideo.current == null) return;
 
@@ -70,22 +83,98 @@ export const MainContent = () => {
         await SkyWayStreamFactory.createMicrophoneAudioAndCameraStream();
       stream.video.attach(localVideo.current);
 
+      const dataStream = await SkyWayStreamFactory.createDataStream();
+
       await localVideo.current.play();
       setLocalStream(stream);
+      setLocalDataStream(dataStream);
     };
 
     initialize();
+    console.log("初期化がされました！");
   }, [token, localVideo]);
+
+  // 自分自身のウィンドウの位置・大きさの調整
+  const [ myWindowPosition, setMyWindowPosition ] = useState<WindowPosition>({ top: 0, left: 0 });
+
+  const myWindowContainerStyle = useMemo<React.CSSProperties>(() => ({
+      top: myWindowPosition.top,
+      left: myWindowPosition.left
+  }), [ myWindowPosition ]);
+
+  // myWindowPositionが更新された時の処理
+  useEffect(() => {
+    console.log("自分のデータ送信中...");
+    if (localDataStream != null) {
+      localDataStream.write(myWindowPosition);
+      console.log("自分のデータを送信しました！");
+    }
+  }, [ myWindowPosition ]);
+
+  // これを field-area の div の onKeyDown に指定
+  const onKeyDown = useCallback((e:React.KeyboardEvent<HTMLDivElement>) => {
+    let h = 0;
+    let v = 0;
+    
+    // 移動量は適当に決める
+    if (e.key === "Left" || e.key === "ArrowLeft") {
+        h = -8;
+    } else if (e.key === "Up" || e.key === "ArrowUp") {
+        v = -8;
+    } else if (e.key === "Right" || e.key === "ArrowRight") {
+        h = 8;
+    } else if (e.key === "Down" || e.key === "ArrowDown") {
+        v = 8;
+    } else {
+        return;
+    }
+
+    // myWindowPositionに反映
+    setMyWindowPosition(pre => {
+        const newPosition: WindowPosition = {
+            ...pre,
+            top: pre.top + v,
+            left: pre.left + h
+        };
+
+        // 実際には、フィールド領域をはみ出ないように調整を入れる（省略）
+
+        return newPosition;
+    });
+  }, []);
+
+  // 他ユーザの座標情報を保持
+  // （これを自分のアイコンと同様に画面表示用のstyleに反映する）
+  const [ otherUserWindowPosition, setOtherUserWindowPosition ] = useState<WindowPosition>({ top:0, left:0 });
+
+  // 他ユーザのウィンドウの位置・大きさの変更
+  const otherUserWindowContainerStyle = useMemo<React.CSSProperties>(() => ({
+    top: otherUserWindowPosition.top,
+    left: otherUserWindowPosition.left
+  }), [ otherUserWindowPosition ]);
+
+  useEffect(() => {
+    console.log("相手のデータ受信設定");
+    if (otherUserDataStream != null) {
+      // callbackで受信座標を反映する
+      otherUserDataStream.onData.add((args) => {
+        setOtherUserWindowPosition(args as WindowPosition)
+        console.log("相手のデータを受信しました！");
+      });
+    }
+  }, [ otherUserDataStream ]);
 
   // ルーム名
   const [ roomName, setRoomName ] = useState("");
   // 自分自身の参加者情報
   const [ me, setMe ] = useState<LocalP2PRoomMember>();
 
+  // ルームに入ることができるかの確認
   const canJoin = useMemo(() => {
     return roomName !== "" && localStream != null && me == null;
   }, [roomName, localStream, me]);
 
+  // Joinボタンをクリックした時に実行する関数
   const onJoinClick = useCallback(async () => {
     // canJoinまでにチェックされるので，普通は起きない
     // assertionメソッドにしてもいい
@@ -102,51 +191,51 @@ export const MainContent = () => {
     const me = await room.join();
     setMe(me);
 
-    // const dataStream = await SkyWayStreamFactory.createDataStream();
-
     // 映像と音声を配信
     await me.publish(localStream.video);
     await me.publish(localStream.audio);
-    // await me.publish(dataStream);
-
-    // （以下，データ送信方法）
-    // // 任意のデータ
-    // const data = { message: "こんにちは" };
-    // // データ送信
-    // dataStream.write(data);
-
-
+    if (localDataStream !== undefined) {
+      console.log("published data stream");
+      await me.publish(localDataStream);
+    }
 
     // 自分以外の参加者情報を取得
-    setOtherUserPublications(room.publications.filter(p => p.publisher.id !== me.id));
+    const otherPublifications = room.publications.filter(p => p.publisher.id !== me.id);
+    setOtherUserPublications(otherPublifications);
+    console.log(otherPublifications);
+    for (let i = 0; i < otherPublifications.length; i++) {
+      if (otherPublifications[i].contentType === "data") {
+        const { stream } = await me.subscribe(otherPublifications[i].id);
+        if (stream.contentType === "data") {
+          setOtherUserDataStream(stream);
+        }
+      }
+    }
 
     // その後に参加してきた人の情報を取得
-    room.onStreamPublished.add((e) => {
+    room.onStreamPublished.add(async (e) => {
       if (e.publication.publisher.id !== me.id) {
         setOtherUserPublications(pre => [ ...pre, e.publication ]);
       }
+
+      console.log(e);
+      if (e.publication.contentType === "data") {
+        console.log("DataStreamを購読しました！");
+        const { stream } = await me.subscribe(e.publication.id);
+        // ここは必ずRemoteDataStreamになるはず
+        if (stream.contentType === "data") {
+          console.log("!!!!!!!!!", stream);
+          setOtherUserDataStream(stream);
+          // データ受信時のcallbackを登録
+          // const { removeListener } = stream.onData.add((data) => setOtherUserWindowPosition(data as WindowPosition));
+    
+          // 購読解除する時
+          // removeListener();
+        }
+      }
     });
 
-    // データ受信
-    // room.onStreamPublished.add(async (e) => {
-    //   // DataStreamを購読
-    //   if (e.publication.stream?.contentType === "data") {
-    //     const { stream } = await me.subscribe(e.publication.id);
-    //     // ここは必ずRemoteDataStreamになるはず
-    //     if (stream.contentType === "data") {
-    //       // データ受信時のcallbackを登録
-    //       const { removeListener } = stream.onData.add(data => {
-    //         // 受信データ
-    //         const receivedData = data as {message: string};
-    //       });
-
-    //       // 購読解除する時
-    //       removeListener();
-    //     }
-    //   }
-    // })
-
-  }, [roomName, token, localStream]);
+  }, [roomName, token, localStream, localDataStream]);
 
   const [ otherUserPublications, setOtherUserPublications ] = useState<RoomPublication<LocalStream>[]>([]);
   
@@ -157,13 +246,17 @@ export const MainContent = () => {
         room name: <input type="text" value={roomName} onChange={(e) => setRoomName(e.target.value)} />
         <button onClick={onJoinClick} disabled={!canJoin}>join</button>
       </div>
-      <video ref={localVideo} width="400px" muted playsInline></video>
-      <div>
+      <div className="field-area" tabIndex={-1} onKeyDown={ onKeyDown }>
+        <div className="icon-container" style={myWindowContainerStyle}>
+          <video className="video" ref={localVideo} width="200px" muted playsInline></video>
+        </div>
+        <div className="icon-container" style={otherUserWindowContainerStyle}>
         {
           me != null && otherUserPublications.map(p => (
-            <RemoteMedia key={p.id} me={me} publication={p} />
+            <RemoteMedia width="200px" key={p.id} me={me} publication={p}/>
           ))
         }  
+        </div>
       </div>
     </div>
   )

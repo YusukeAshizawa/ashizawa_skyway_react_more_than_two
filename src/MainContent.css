@@ -1,0 +1,19 @@
+.field-area {    
+  position: relative;
+  width: 800px;
+  height: 400px;
+  /* 適当に影とか背景色とか */
+  background-color: #F0F0F0;
+  box-shadow: rgba(0, 0, 0, 0.24) 0px 3px 8px;
+}
+
+.icon-container {
+  position: absolute;    
+}
+
+/* .video {
+  object-fit: cover;
+  clip-path:circle(50% at 50% 50%);
+  width: 90px;
+  height: 90px;
+} */

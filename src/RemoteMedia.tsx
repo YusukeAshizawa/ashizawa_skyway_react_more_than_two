@@ -1,9 +1,10 @@
 import { LocalP2PRoomMember, LocalStream, RemoteAudioStream, RemoteVideoStream, RoomPublication } from "@skyway-sdk/room"
-import { useCallback, useEffect, useRef, useState } from "react"
+import React, { useCallback, useEffect, useRef, useState } from "react"
 
 export const RemoteMedia = (props: {
   me: LocalP2PRoomMember,
-  publication: RoomPublication<LocalStream>
+  publication: RoomPublication<LocalStream>,
+  width: string
 }) => {
   // TODO
   const [ stream, setStream ] = useState<RemoteVideoStream | RemoteAudioStream>();
@@ -43,7 +44,7 @@ export const RemoteMedia = (props: {
 
   // 映像のとき
   if (stream.contentType === "video") {
-    return <video width="400px" playsInline={true} autoPlay={true} ref={refVideo} />;
+    return <video width={props.width} playsInline={true} autoPlay={true} ref={refVideo}/>;
   }
 
   // 音声のとき
