@@ -11,9 +11,14 @@
   position: absolute;    
 }
 
-/* .video {
-  object-fit: cover;
-  clip-path:circle(50% at 50% 50%);
-  width: 90px;
-  height: 90px;
-} */
+/* 自分側のウィンドウの大きさを調整 */
+#local-video {
+  max-width: 1000px;  /*ウィンドウの横幅の最大値*/
+  max-height: 1000px;  /*ウィンドウの縦幅の最大値*/
+}
+
+/* 相手側のウィンドウの大きさを調整 */
+#remote-video {
+  max-width: 1000px;  /*ウィンドウの横幅の最大値*/
+  max-height: 1000px;  /*ウィンドウの縦幅の最大値*/
+}

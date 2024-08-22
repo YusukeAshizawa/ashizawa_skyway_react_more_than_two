@@ -4,7 +4,8 @@ import React, { useCallback, useEffect, useRef, useState } from "react"
 export const RemoteMedia = (props: {
   me: LocalP2PRoomMember,
   publication: RoomPublication<LocalStream>,
-  width: string
+  id: string
+  style: React.CSSProperties
 }) => {
   // TODO
   const [ stream, setStream ] = useState<RemoteVideoStream | RemoteAudioStream>();
@@ -44,9 +45,9 @@ export const RemoteMedia = (props: {
 
   // 映像のとき
   if (stream.contentType === "video") {
-    return <video width={props.width} playsInline={true} autoPlay={true} ref={refVideo}/>;
+    return <video id={props.id} playsInline={true} autoPlay={true} ref={refVideo} style={props.style}/>;
   }
 
   // 音声のとき
-  return <audio controls={true} autoPlay={true} ref={refAudio} />;
+  return <audio id={props.id} controls={true} autoPlay={true} ref={refAudio} />;
 }

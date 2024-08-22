@@ -3,9 +3,10 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { RemoteMedia } from "./RemoteMedia";
 import "./MainContent.css"
 
-interface WindowPosition {
+interface WindowInfo {
     top: number;
     left: number;
+    width: number;
 }
 
 export const MainContent = () => {
@@ -95,21 +96,23 @@ export const MainContent = () => {
   }, [token, localVideo]);
 
   // 自分自身のウィンドウの位置・大きさの調整
-  const [ myWindowPosition, setMyWindowPosition ] = useState<WindowPosition>({ top: 0, left: 0 });
+  const [ myWindowInfo, setMyWindowInfo ] = useState<WindowInfo>({ top: 0, left: 0, width: 200 });
 
   const myWindowContainerStyle = useMemo<React.CSSProperties>(() => ({
-      top: myWindowPosition.top,
-      left: myWindowPosition.left
-  }), [ myWindowPosition ]);
+      position: "absolute",
+      top: myWindowInfo.top,
+      left: myWindowInfo.left,
+      width: myWindowInfo.width
+  }), [ myWindowInfo ]);
 
   // myWindowPositionが更新された時の処理
   useEffect(() => {
     console.log("自分のデータ送信中...");
     if (localDataStream != null) {
-      localDataStream.write(myWindowPosition);
+      localDataStream.write(myWindowInfo);
       console.log("自分のデータを送信しました！");
     }
-  }, [ myWindowPosition ]);
+  }, [ myWindowInfo ]);
 
   // これを field-area の div の onKeyDown に指定
   const onKeyDown = useCallback((e:React.KeyboardEvent<HTMLDivElement>) => {
@@ -129,36 +132,39 @@ export const MainContent = () => {
         return;
     }
 
-    // myWindowPositionに反映
-    setMyWindowPosition(pre => {
-        const newPosition: WindowPosition = {
-            ...pre,
+    // myWindowInfoに反映
+    // ウィンドウの位置・大きさを変更
+    setMyWindowInfo(pre => {
+        const newInfo: WindowInfo = {
             top: pre.top + v,
-            left: pre.left + h
+            left: pre.left + h,
+            width: pre.width + v
         };
 
-        // 実際には、フィールド領域をはみ出ないように調整を入れる（省略）
+        // TODO: 実際には、フィールド領域をはみ出ないように調整を入れる（省略）
 
-        return newPosition;
+        return newInfo;
     });
   }, []);
 
   // 他ユーザの座標情報を保持
   // （これを自分のアイコンと同様に画面表示用のstyleに反映する）
-  const [ otherUserWindowPosition, setOtherUserWindowPosition ] = useState<WindowPosition>({ top:0, left:0 });
+  const [ otherUserWindowInfo, setOtherUserWindowInfo ] = useState<WindowInfo>({ top: 0, left: 0, width: 200 });
 
   // 他ユーザのウィンドウの位置・大きさの変更
   const otherUserWindowContainerStyle = useMemo<React.CSSProperties>(() => ({
-    top: otherUserWindowPosition.top,
-    left: otherUserWindowPosition.left
-  }), [ otherUserWindowPosition ]);
+    position: "absolute",
+    top: otherUserWindowInfo.top,
+    left: otherUserWindowInfo.left,
+    width: otherUserWindowInfo.width
+  }), [ otherUserWindowInfo ]);
 
   useEffect(() => {
     console.log("相手のデータ受信設定");
     if (otherUserDataStream != null) {
       // callbackで受信座標を反映する
       otherUserDataStream.onData.add((args) => {
-        setOtherUserWindowPosition(args as WindowPosition)
+        setOtherUserWindowInfo(args as WindowInfo);
         console.log("相手のデータを受信しました！");
       });
     }
@@ -202,7 +208,7 @@ export const MainContent = () => {
     // 自分以外の参加者情報を取得
     const otherPublifications = room.publications.filter(p => p.publisher.id !== me.id);
     setOtherUserPublications(otherPublifications);
-    console.log(otherPublifications);
+    // console.log(otherPublifications);
     for (let i = 0; i < otherPublifications.length; i++) {
       if (otherPublifications[i].contentType === "data") {
         const { stream } = await me.subscribe(otherPublifications[i].id);
@@ -219,7 +225,7 @@ export const MainContent = () => {
       }
 
       console.log(e);
-      if (e.publication.contentType === "data") {
+      if (e.publication.contentType === "data" && e.publication.publisher.id !== me.id) {
         console.log("DataStreamを購読しました！");
         const { stream } = await me.subscribe(e.publication.id);
         // ここは必ずRemoteDataStreamになるはず
@@ -247,13 +253,13 @@ export const MainContent = () => {
         <button onClick={onJoinClick} disabled={!canJoin}>join</button>
       </div>
       <div className="field-area" tabIndex={-1} onKeyDown={ onKeyDown }>
-        <div className="icon-container" style={myWindowContainerStyle}>
-          <video className="video" ref={localVideo} width="200px" muted playsInline></video>
+        <div className="icon-container">
+          <video id="local-video" ref={localVideo} muted playsInline style={myWindowContainerStyle}></video>
         </div>
-        <div className="icon-container" style={otherUserWindowContainerStyle}>
+        <div className="icon-container">
         {
           me != null && otherUserPublications.map(p => (
-            <RemoteMedia width="200px" key={p.id} me={me} publication={p}/>
+            <RemoteMedia id="remote-video" key={p.id} me={me} publication={p} style={otherUserWindowContainerStyle}/>
           ))
         }  
         </div>
