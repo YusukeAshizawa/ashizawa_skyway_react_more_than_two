@@ -13,12 +13,12 @@ interface WindowInfo {
 }
 
 // 数値型リストの要素の平均値を求める関数
-function Average(number_list: number[]) {
+function Average(number_list: number[], start_id: number = 0, end_id: number = number_list.length - 1) {
   let sum = 0;  // 引数のリスト内の要素の合計値
-  number_list.forEach((number) => {
-    sum += number;
-  })
-  return sum / number_list.length;
+  for (let i = start_id; i < end_id + 1; i++) {
+    sum += number_list[i];
+  }
+  return sum / (end_id - start_id + 1);
 }
 
 // 2つのベクトル（数値型リスト）の内積を求める関数
@@ -31,7 +31,27 @@ function Norm(number_list: number[]) {
   return Math.sqrt(number_list[0] * number_list[0] + number_list[1] * number_list[1]);
 }
 
+// 移動平均計算用の
+let move_top_positions = [];
+let move_left_positions = [];
+
 export const MainContent = () => {
+  // スクリーンの幅・高さ
+  const screenWidth = 1850;
+  const screenHeight = 800;
+  // ビデオウィンドウのデフォルト位置
+  const default_center_X = screenWidth/2;
+  const default_center_Y = screenHeight/2;
+  const default_top = default_center_Y - 200/2;
+  const default_left = default_center_X - 200/2;
+
+  // ビデオウィンドウの大きさの最小値・最大値・初期値
+  const width_min = 50;
+  const width_max = 500;
+  const default_width = width_max;
+  // 移動量の拡大率
+  const distance_rate_move = 10000;
+
   const appId = useMemo(() => process.env.REACT_APP_SKYWAY_APP_ID, []);
   const secretKey = useMemo(() => process.env.REACT_APP_SKYWAY_SECRET_KEY, []);
 
@@ -118,7 +138,7 @@ export const MainContent = () => {
   }, [token, localVideo]);
 
   // 自分自身のウィンドウの位置・大きさの調整
-  const [ myWindowInfo, setMyWindowInfo ] = useState<WindowInfo>({ top: 0, left: 0, width: 200 });
+  const [ myWindowInfo, setMyWindowInfo ] = useState<WindowInfo>({ top: default_top, left: default_left, width: default_width });  // （中心の値を決め打ちしていいのだろうか...？）
 
   const myWindowContainerStyle = useMemo<React.CSSProperties>(() => ({
       position: "absolute",
@@ -179,7 +199,7 @@ export const MainContent = () => {
     const face_center_pos = [Average(landmarks_pos_x), Average(landmarks_pos_y)];
     // 頭部方向を計算するためのベクトル
     const base_vector = [1,0];  
-    // 顔の中心点を原点とした時の，正面を向いた際の顔の中心点の座標
+    // 顔の中心点を原点とした時の，正面を向いた際の顔の中心点のベクトル
     const fc_d_from_fc_vector = [face_center_default_pos[0] - face_center_pos[0], face_center_default_pos[1] - face_center_pos[1]];
     // console.log("face_center_pos = " + face_center_default_pos);
     // console.log("face_center_default_pos = " + face_center_default_pos);
@@ -194,7 +214,33 @@ export const MainContent = () => {
       rad_head_direction = -rad_head_direction;
       theta_head_direction = Math.PI * 2 - theta_head_direction;
     }
-    console.log("theta_head_direction = " + theta_head_direction);
+    // console.log("theta_head_direction = " + theta_head_direction);
+    // console.log("diff_top = " + distance_rate_move * Norm(fc_d_from_fc_vector) * Math.sin(rad_head_direction));
+    // console.log("diff_left = " + distance_rate_move * Norm(fc_d_from_fc_vector) * Math.cos(rad_head_direction));
+
+    // 対話相手のウィンドウの大きさの変更
+    let next_width_rate = 0;
+    // 顔の中心点を原点とした時の，正面を向いた際の顔の中心点のベクトルの長さによって，ウィンドウの大きさを変更
+    if (450 * Norm(fc_d_from_fc_vector) <= 1) {
+      next_width_rate = 1;
+    }
+    else {
+      next_width_rate = 1 / (450 * Norm(fc_d_from_fc_vector));
+    }
+
+    // TODO: 取得した頭部方向の値を基に，対話相手のウィンドウの位置・大きさを変更
+    // widthの範囲：50~500？
+    setMyWindowInfo(pre => {
+      const newInfo: WindowInfo = {
+        top: default_center_Y + distance_rate_move * Norm(fc_d_from_fc_vector) * Math.sin(rad_head_direction) - pre.width/2,
+        left: default_center_X + distance_rate_move * Norm(fc_d_from_fc_vector) * Math.cos(rad_head_direction) - pre.width/2,
+        width: width_min + (width_max - width_min) * (next_width_rate)
+      };
+
+      // TODO: 実際には、フィールド領域をはみ出ないように調整を入れる（省略）
+
+      return newInfo;
+    });
   },[]);
 
   useEffect(() => {
@@ -229,40 +275,40 @@ export const MainContent = () => {
 
   // これを field-area の div の onKeyDown に指定
   const onKeyDown = useCallback((e:React.KeyboardEvent<HTMLDivElement>) => {
-    let h = 0;
-    let v = 0;
+    // let h = 0;
+    // let v = 0;
     
-    // 移動量は適当に決める
-    if (e.key === "Left" || e.key === "ArrowLeft") {
-        h = -8;
-    } else if (e.key === "Up" || e.key === "ArrowUp") {
-        v = -8;
-    } else if (e.key === "Right" || e.key === "ArrowRight") {
-        h = 8;
-    } else if (e.key === "Down" || e.key === "ArrowDown") {
-        v = 8;
-    } else {
-        return;
-    }
+    // // 移動量は適当に決める
+    // if (e.key === "Left" || e.key === "ArrowLeft") {
+    //     h = -8;
+    // } else if (e.key === "Up" || e.key === "ArrowUp") {
+    //     v = -8;
+    // } else if (e.key === "Right" || e.key === "ArrowRight") {
+    //     h = 8;
+    // } else if (e.key === "Down" || e.key === "ArrowDown") {
+    //     v = 8;
+    // } else {
+    //     return;
+    // }
 
-    // myWindowInfoに反映
-    // ウィンドウの位置・大きさを変更
-    setMyWindowInfo(pre => {
-        const newInfo: WindowInfo = {
-            top: pre.top + v,
-            left: pre.left + h,
-            width: pre.width + v
-        };
+    // // myWindowInfoに反映
+    // // ウィンドウの位置・大きさを変更
+    // setMyWindowInfo(pre => {
+    //     const newInfo: WindowInfo = {
+    //         top: pre.top + v,
+    //         left: pre.left + h,
+    //         width: pre.width + v
+    //     };
 
-        // TODO: 実際には、フィールド領域をはみ出ないように調整を入れる（省略）
+    //     // TODO: 実際には、フィールド領域をはみ出ないように調整を入れる（省略）
 
-        return newInfo;
-    });
+    //     return newInfo;
+    // });
   }, []);
 
   // 他ユーザの座標情報を保持
   // （これを自分のアイコンと同様に画面表示用のstyleに反映する）
-  const [ otherUserWindowInfo, setOtherUserWindowInfo ] = useState<WindowInfo>({ top: 0, left: 0, width: 200 });
+  const [ otherUserWindowInfo, setOtherUserWindowInfo ] = useState<WindowInfo>({ top: default_top, left: default_left, width: default_width });
 
   // 他ユーザのウィンドウの位置・大きさの変更
   const otherUserWindowContainerStyle = useMemo<React.CSSProperties>(() => ({
