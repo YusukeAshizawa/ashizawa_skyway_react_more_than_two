@@ -198,7 +198,7 @@ export const MainContent = () => {
     // 顔の中心点の座標
     const face_center_pos = [Average(landmarks_pos_x), Average(landmarks_pos_y)];
     // 頭部方向を計算するためのベクトル
-    const base_vector = [1,0];  
+    const base_vector = [1,0];
     // 顔の中心点を原点とした時の，正面を向いた際の顔の中心点のベクトル
     const fc_d_from_fc_vector = [face_center_default_pos[0] - face_center_pos[0], face_center_default_pos[1] - face_center_pos[1]];
     // console.log("face_center_pos = " + face_center_default_pos);
