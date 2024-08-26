@@ -48,6 +48,11 @@ let move_top_positions: number[] = [];
 let move_left_positions: number[] = [];
 let move_width: number[] = [];
 
+// 条件ID（1: Baseline, 2: PositionChange, 3: SizeChange, 4: PositionAndSizeChange）
+let condition_ID = 1;
+// 条件名
+let condition_name = "Baseline";
+
 export const MainContent = () => {
   // スクリーンの幅・高さ
   // TODO: 値を要修正
@@ -63,6 +68,7 @@ export const MainContent = () => {
   const width_min = 50;
   const width_max = 500;
   const default_width = width_max;
+  const default_width_baseline = 300;
   // 移動量の拡大率
   const distance_rate_move = 10000;
 
@@ -257,6 +263,7 @@ export const MainContent = () => {
       if (left_value < 0) left_value = 0;
       else if (left_value > screenWidth - width_value) left_value = screenWidth - width_value;
 
+      // 移動平均を導入するために，値を保存
       move_top_positions.push(top_value);
       move_left_positions.push(left_value);
       move_width.push(width_value);
@@ -282,11 +289,49 @@ export const MainContent = () => {
 
       if (width_value < width_min) width_value = width_min;
 
-      const newInfo: WindowInfo = {
+      let newInfo: WindowInfo = {
         top: top_value,
         left: left_value,
         width: width_value
       };
+
+      switch(condition_ID) {
+        case 1:  // Baseline条件
+          newInfo = {
+            top: default_top,
+            left: default_left,
+            width: default_width_baseline
+          };
+          break;
+        case 2:  // PositionChange条件
+          newInfo = {
+            top: top_value,
+            left: left_value,
+            width: default_width_baseline
+          };
+          break;
+        case 3:  // SizeChange条件
+          newInfo = {
+            top: default_top,
+            left: default_left,
+            width: width_value
+          };
+          break;
+        case 4:  // PositionAndChange条件
+          newInfo = {
+            top: top_value,
+            left: left_value,
+            width: width_value
+          };
+          break;
+        default:  // （念のため，）Baseline条件
+          newInfo = {
+            top: default_top,
+            left: default_left,
+            width: default_width_baseline
+          };
+          break;
+      }
 
       return newInfo;
     });
@@ -449,16 +494,51 @@ export const MainContent = () => {
       }
     });
 
+    // 部屋名のみを表示させる
+    document.getElementById("active-after-conference")?.classList.remove("non-active");
+    document.getElementById("active-before-conference")?.classList.add("non-active");
+
   }, [roomName, token, localStream, localDataStream]);
 
   const [ otherUserPublications, setOtherUserPublications ] = useState<RoomPublication<LocalStream>[]>([]);
   
   return (
     <div>
-      <p>ID: {me?.id ?? ""} </p>
-      <div>
+      <div id="active-before-conference">
+        <p>
+        condition=
+        <select id="condition" onChange={(event) => { 
+          condition_ID = Number(event.target.value);
+          switch(condition_ID) {
+            case 1:
+              condition_name = "Baseline";
+              break;
+            case 2:
+              condition_name = "PositionChange";
+              break;
+            case 3:
+              condition_name = "SizeChange";
+              break;
+            case 4:
+              condition_name = "PositionAndSizeChange";
+              break;
+            default:
+              condition_name = "";
+              break;
+          }
+        }}>
+          <option value="1">Baseline</option>
+          <option value="2">PositionChange</option>
+          <option value="3">SizeChange</option>
+          <option value="4">PositionAndSizeChange</option>
+        </select>　
+        {/* ID: {me?.id ?? ""} */}
+        </p>
         room name: <input type="text" value={roomName} onChange={(e) => setRoomName(e.target.value)} />
         <button onClick={onJoinClick} disabled={!canJoin}>join</button>
+      </div>
+      <div id="active-after-conference" className="non-active">
+        ID: {me?.id ?? ""}　room name: {roomName}　condition: {condition_name}
       </div>
       {/* <div className="field-area" tabIndex={-1} onKeyDown={ onKeyDown }> */}
         <div className="icon-container">
@@ -470,7 +550,7 @@ export const MainContent = () => {
           me != null && otherUserPublications.map(p => (
             <RemoteMedia id="remote-video" key={p.id} me={me} publication={p} style={otherUserWindowContainerStyle}/>
           ))
-        }  
+        }
         </div>
       {/* </div> */}
     </div>
