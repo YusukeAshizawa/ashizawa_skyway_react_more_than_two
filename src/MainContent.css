@@ -15,6 +15,7 @@
 #local-video {
   max-width: 1000px;  /*ウィンドウの横幅の最大値*/
   max-height: 1000px;  /*ウィンドウの縦幅の最大値*/
+  display: none;
 }
 
 /* 相手側のウィンドウの大きさを調整 */
