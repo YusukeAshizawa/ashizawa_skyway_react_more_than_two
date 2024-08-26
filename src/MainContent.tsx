@@ -42,7 +42,7 @@ function Norm(number_list: number[]) {
 }
 
 // 移動平均計算時のフレーム数
-let MovingAverage_frame = 20;
+const MovingAverage_frame = 20;
 // 移動平均計算用の配列
 let move_top_positions: number[] = [];
 let move_left_positions: number[] = [];
@@ -56,19 +56,20 @@ let condition_name = "Baseline";
 export const MainContent = () => {
   // スクリーンの幅・高さ
   // TODO: 値を要修正
-  const screenWidth = 1850;
-  const screenHeight = 800;
-  // ビデオウィンドウのデフォルト位置
+  const screenWidth = window.outerWidth;
+  const screenHeight = window.innerHeight;
+  // ビデオウィンドウのデフォルトの中心位置
   const default_center_X = screenWidth/2;
   const default_center_Y = screenHeight/2;
-  const default_top = default_center_Y - 200/2;
-  const default_left = default_center_X - 200/2;
+  // ビデオウィンドウの大きさのデフォルト値
+  const default_width = 300;
+  // ビデオウィンドウのデフォルトのtop・left位置
+  const default_top = default_center_Y - default_width/2;
+  const default_left = default_center_X - default_width/2;
 
-  // ビデオウィンドウの大きさの最小値・最大値・初期値
+  // ビデオウィンドウの大きさの最小値・最大値
   const width_min = 50;
   const width_max = 500;
-  const default_width = width_max;
-  const default_width_baseline = 300;
   // 移動量の拡大率
   const distance_rate_move = 10000;
 
@@ -252,9 +253,27 @@ export const MainContent = () => {
     // widthの範囲：50~500？
     // 要検討：ウィンドウの動きとユーザの実際の動きを合わせるために，左右反転させる？
     setMyWindowInfo(pre => {
-      let top_value = default_center_Y + distance_rate_move * Norm(fc_d_from_fc_vector) * Math.sin(rad_head_direction) - pre.width/2;
-      let left_value = default_center_X + distance_rate_move * Norm(fc_d_from_fc_vector) * Math.cos(rad_head_direction - Math.PI) - pre.width/2;
+      // ウィンドウの大きさを踏まえて，ウィンドウの位置を決めるため，ウィンドウの大きさ → ウィンドウの位置の順に算出する
+      // 1. ウィンドウの大きさの算出
       let width_value = width_max * (next_width_rate);
+
+      // 移動平均を導入するために，値を保存
+      move_width.push(width_value);
+
+      if (move_width.length < 10) width_value = Average_value(move_width, 0, move_width.length - 1);
+      else{
+        if (move_width.length > MovingAverage_frame + 10) move_width.shift();
+        width_value = Average_value(move_width, move_width.length - MovingAverage_frame, move_width.length - 1);
+      }
+
+      if (width_value < width_min) width_value = width_min;
+
+      // PositionChange条件の時には，top・leftの値にwidth_valueの値が影響を与えないようにするために，width_valueの値を更新
+      if (condition_ID === 2) width_value = default_width;
+
+      // 2. ウィンドウの位置の算出
+      let top_value = default_center_Y + distance_rate_move * Norm(fc_d_from_fc_vector) * Math.sin(rad_head_direction) - width_value/2;
+      let left_value = default_center_X + distance_rate_move * Norm(fc_d_from_fc_vector) * Math.cos(rad_head_direction - Math.PI) - width_value/2;
 
       // フィールド領域をはみ出ないように調整を入れる
       if (top_value < 0) top_value = 0;
@@ -266,7 +285,6 @@ export const MainContent = () => {
       // 移動平均を導入するために，値を保存
       move_top_positions.push(top_value);
       move_left_positions.push(left_value);
-      move_width.push(width_value);
 
       // 移動平均の計算 + リストの肥大化の防止
       if (move_top_positions.length < 10) top_value = Average_value(move_top_positions, 0, move_top_positions.length - 1);
@@ -281,39 +299,27 @@ export const MainContent = () => {
         left_value = Average_value(move_left_positions, move_left_positions.length - MovingAverage_frame, move_left_positions.length - 1);
       }
 
-      if (move_width.length < 10) width_value = Average_value(move_width, 0, move_width.length - 1);
-      else{
-        if (move_width.length > MovingAverage_frame + 10) move_width.shift();
-        width_value = Average_value(move_width, move_width.length - MovingAverage_frame, move_width.length - 1);
-      }
-
-      if (width_value < width_min) width_value = width_min;
-
-      let newInfo: WindowInfo = {
-        top: top_value,
-        left: left_value,
-        width: width_value
-      };
+      let newInfo: WindowInfo;
 
       switch(condition_ID) {
         case 1:  // Baseline条件
           newInfo = {
             top: default_top,
             left: default_left,
-            width: default_width_baseline
+            width: default_width
           };
           break;
         case 2:  // PositionChange条件
           newInfo = {
             top: top_value,
             left: left_value,
-            width: default_width_baseline
+            width: default_width
           };
           break;
         case 3:  // SizeChange条件
           newInfo = {
-            top: default_top,
-            left: default_left,
+            top: default_center_Y - width_value/2,
+            left: default_center_X - width_value/2,
             width: width_value
           };
           break;
@@ -324,11 +330,11 @@ export const MainContent = () => {
             width: width_value
           };
           break;
-        default:  // （念のため，）Baseline条件
+        default:  // Baseline条件
           newInfo = {
             top: default_top,
             left: default_left,
-            width: default_width_baseline
+            width: default_width
           };
           break;
       }
