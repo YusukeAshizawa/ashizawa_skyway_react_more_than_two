@@ -187,9 +187,9 @@ export const MainContent = () => {
     resultsRef.current = results;
 
     // 頭部方向の取得
-    let landmarks_pos_x = []  // 468個の点のx座標を格納するリスト
-    let landmarks_pos_y = []  // 468個の点のy座標を格納するリスト
-    let face_center_default_pos = []  // 正面を向いた時の顔の中心点（ここでは，飯塚さんの修論に倣って，鼻の先の座標としている．）
+    let landmarks_pos_x: number[] = []  // 468個の点のx座標を格納するリスト
+    let landmarks_pos_y: number[] = []  // 468個の点のy座標を格納するリスト
+    let face_center_default_pos: number[] = []  // 正面を向いた時の顔の中心点（ここでは，飯塚さんの修論に倣って，鼻の先の座標としている．）
     if (results.multiFaceLandmarks && results.multiFaceLandmarks[0]) {
       for (let id = 0; id < results.multiFaceLandmarks[0].length; id++) {
         // 特定の顔の点を取得（x座標）
