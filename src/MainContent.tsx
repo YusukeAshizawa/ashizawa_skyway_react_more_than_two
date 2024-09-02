@@ -56,11 +56,14 @@ let condition_name = "Baseline";
 export const MainContent = () => {
   // スクリーンの幅・高さ
   // TODO: 値を要修正
-  const screenWidth = window.outerWidth;
+  const screenWidth = window.innerWidth;
   const screenHeight = window.innerHeight;
+  // スクロール位置を取得
+  const scrollX = window.scrollX;
+  const scrollY = window.scrollY;
   // ビデオウィンドウのデフォルトの中心位置
-  const default_center_X = screenWidth/2;
-  const default_center_Y = screenHeight/2;
+  const default_center_X = scrollX + screenWidth/2;
+  const default_center_Y = scrollY + screenHeight/2;
   // ビデオウィンドウの大きさのデフォルト値
   const default_width = 300;
   // ビデオウィンドウのデフォルトのtop・left位置
