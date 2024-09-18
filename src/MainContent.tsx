@@ -458,7 +458,6 @@ export const MainContent = () => {
       // callbackで受信座標を反映する
       otherUserDataStream.onData.add((args) => {
         setOtherUserWindowInfo(args as WindowInfo);
-        console.log("bbb");
         console.log(args);
         // 対話相手のスクリーン情報の初期化
         InitOtherScreenInfo(otherUserWindowInfo.screenWidth, otherUserWindowInfo.screenHeight, otherUserWindowInfo.scrollX, otherUserWindowInfo.scrollY);
