@@ -57,21 +57,12 @@ let condition_ID = 1;
 // 条件名
 let condition_name = "Baseline";
 
-// ビデオウィンドウの大きさのデフォルト値（参加者・対話相手共通）
-const default_width = 300;
-
 // スクリーンの幅・高さ（参加者側）
 let screenMyWidth = window.innerWidth;
 let screenMyHeight = window.innerHeight;
 // スクロール位置を取得（参加者側）
 let scrollMyX = window.scrollX;
 let scrollMyY = window.scrollY;
-// // ビデオウィンドウのデフォルトの中心位置（参加者側）
-// let default_Mycenter_X = scrollMyX + screenMyWidth/2;
-// let default_Mycenter_Y = scrollMyY + screenMyHeight/2;
-// // ビデオウィンドウのデフォルトのtop・left位置（参加者側）
-// let default_Mytop = default_Mycenter_Y - default_width/2;
-// let default_Myleft = default_Mycenter_X - default_width/2;
 
 // スクリーンの幅・高さ（対話相手側）
 let screenOtherWidth = window.innerWidth;
@@ -79,18 +70,15 @@ let screenOtherHeight = window.innerHeight;
 // スクロール位置を取得（対話相手側）
 let scrollOtherX = window.scrollX;
 let scrollOtherY = window.scrollY;
-// // ビデオウィンドウのデフォルトの中心位置（対話相手側）
-// let default_Othercenter_X = scrollOtherX + screenOtherWidth/2;
-// let default_Othercenter_Y = scrollOtherY + screenOtherHeight/2;
-// // ビデオウィンドウのデフォルトのtop・left位置（対話相手側）
-// let default_Othertop = default_Othercenter_Y - default_width/2;
-// let default_Otherleft = default_Othercenter_X - default_width/2;
 
 // ビデオウィンドウの大きさの最小値・最大値
 const width_min = 50;
 const width_max = 500;
 // 移動量の拡大率
 const distance_rate_move = 10000;
+
+// ビデオウィンドウの大きさのデフォルト値（参加者・対話相手共通）
+const default_width = (width_min + width_max) / 2;
 
 // 対話相手のスクリーンの幅・高さの初期設定
 function InitOtherScreenInfo(screen_width: number, screen_height: number, scroll_X: number, scroll_Y: number) {
@@ -99,12 +87,6 @@ function InitOtherScreenInfo(screen_width: number, screen_height: number, scroll
 
   scrollOtherX = scroll_X;
   scrollOtherY = scroll_Y;
-
-  // default_Othercenter_X = scrollOtherX + screenOtherWidth/2;
-  // default_Othercenter_Y = scrollOtherY + screenOtherHeight/2;
-
-  // default_Othertop = default_Othercenter_Y - default_width/2;
-  // default_Otherleft = default_Othercenter_X - default_width/2;
 }
 
 // ビデオウィンドウのInfoの更新（index = 0：参加者自身のビデオウィンドウ，index = 1：対話相手のビデオウィンドウ）
@@ -410,17 +392,7 @@ export const MainContent = () => {
     // console.log("theta_head_direction = " + theta_head_direction);
     // console.log("diff_top = " + distance_rate_move * Norm(fc_d_from_fc_vector) * Math.sin(rad_head_direction));
     // console.log("diff_left = " + distance_rate_move * Norm(fc_d_from_fc_vector) * Math.cos(rad_head_direction));
-
-    // ウィンドウの大きさの最大値に対する，実際のウィンドウの大きさの比率
-    let next_width_rate = 0;
-    // 顔の中心点を原点とした時の，正面を向いた際の顔の中心点のベクトルの長さによって，ウィンドウの大きさを変更
-    if (150 * Norm(fc_d_from_fc_vector) <= 1) {
-      next_width_rate = 1;
-    }
-    else {
-      next_width_rate = 1 / (150 * Norm(fc_d_from_fc_vector));
-    }
-
+    
     // widthの範囲：50~500？
     // 要検討：ウィンドウの動きとユーザの実際の動きを合わせるために，左右反転させる？
     // 自分自身のスクリーンに対するビデオウィンドウの位置の更新（index = 0：自分自身側のスクリーン基準，index = 1：対話相手側のスクリーン基準）
@@ -457,39 +429,6 @@ export const MainContent = () => {
         faceMesh.close();
     }
   }, [onResults]);
-
-  // これを field-area の div の onKeyDown に指定
-  // const onKeyDown = useCallback((e:React.KeyboardEvent<HTMLDivElement>) => {
-    // let h = 0;
-    // let v = 0;
-    
-    // // 移動量は適当に決める
-    // if (e.key === "Left" || e.key === "ArrowLeft") {
-    //     h = -8;
-    // } else if (e.key === "Up" || e.key === "ArrowUp") {
-    //     v = -8;
-    // } else if (e.key === "Right" || e.key === "ArrowRight") {
-    //     h = 8;
-    // } else if (e.key === "Down" || e.key === "ArrowDown") {
-    //     v = 8;
-    // } else {
-    //     return;
-    // }
-
-    // // myWindowInfoに反映
-    // // ウィンドウの位置・大きさを変更
-    // setMyWindowInfo(pre => {
-    //     const newInfo: WindowInfo = {
-    //         top: pre.top + v,
-    //         left: pre.left + h,
-    //         width: pre.width + v
-    //     };
-
-    //     // TODO: 実際には、フィールド領域をはみ出ないように調整を入れる（省略）
-
-    //     return newInfo;
-    // });
-  // }, []);
 
   // 他ユーザの座標情報を保持
   // （これを自分のアイコンと同様に画面表示用のstyleに反映する）
