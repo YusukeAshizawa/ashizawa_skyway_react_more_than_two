@@ -337,7 +337,7 @@ export const MainContent = () => {
 
   /** 検出結果（フレーム毎に呼び出される） */
   const onResults = useCallback((results: Results) => {
-    console.log(results);
+    // console.log(results);  // デバッグ用
 
     // 顔の座標が正しく取得できている時のみ実行
     if (results.multiFaceLandmarks.length > 0) {
@@ -458,6 +458,9 @@ export const MainContent = () => {
         setOtherUserWindowInfo(args as WindowInfo);
         // 対話相手のスクリーン情報の初期化
         InitOtherScreenInfo(otherUserWindowInfo.screenWidth, otherUserWindowInfo.screenHeight, otherUserWindowInfo.scrollX, otherUserWindowInfo.scrollY);
+        console.log("対話相手のスクリーンの幅 = " + otherUserWindowInfo.screenWidth);  // デバッグ用
+        console.log("対話相手のスクリーンの高さ = " + otherUserWindowInfo.screenHeight);  // デバッグ用
+
         // console.log("相手のデータを受信しました！");
       });
     }
