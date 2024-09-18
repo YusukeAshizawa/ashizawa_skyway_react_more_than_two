@@ -92,8 +92,8 @@ function InitOtherScreenInfo(screen_width: number, screen_height: number, scroll
 // ビデオウィンドウのInfoの更新（index = 0：参加者自身のビデオウィンドウ，index = 1：対話相手のビデオウィンドウ）
 function setWindowInfo(fc_d_from_fc_vector: number[], rad_head_direction: number, screen_Width: number, screen_Height: number, scroll_X: number, scroll_Y: number, index: number) {
   // ビデオウィンドウのデフォルトの中心位置（対話相手側）
-  const default_center_X = scroll_X + screenOtherWidth/2;
-  const default_center_Y = scroll_Y + screenOtherHeight/2;
+  const default_center_X = scroll_X + screen_Width/2;
+  const default_center_Y = scroll_Y + screen_Height/2;
   // ビデオウィンドウのデフォルトのtop・left位置（対話相手側）
   const default_top = default_center_Y - default_width/2;
   const default_left = default_center_X - default_width/2;
@@ -327,6 +327,8 @@ export const MainContent = () => {
     // console.log("自分のデータ送信中...");
     if (localDataStream != null) {
       localDataStream.write(myWindowInfo_based_on_OtherScreen);
+      console.log("対話相手のスクリーンの幅（送信前） = " + myWindowInfo_based_on_OtherScreen.screenWidth);  // デバッグ用
+      console.log("対話相手のスクリーンの高さ（送信前） = " + myWindowInfo_based_on_OtherScreen.screenHeight);  // デバッグ用
       // console.log("自分のデータを送信しました！");
     }
   }, [ myWindowInfo_based_on_OtherScreen ]);
@@ -458,8 +460,8 @@ export const MainContent = () => {
         setOtherUserWindowInfo(args as WindowInfo);
         // 対話相手のスクリーン情報の初期化
         InitOtherScreenInfo(otherUserWindowInfo.screenWidth, otherUserWindowInfo.screenHeight, otherUserWindowInfo.scrollX, otherUserWindowInfo.scrollY);
-        console.log("対話相手のスクリーンの幅 = " + otherUserWindowInfo.screenWidth);  // デバッグ用
-        console.log("対話相手のスクリーンの高さ = " + otherUserWindowInfo.screenHeight);  // デバッグ用
+        console.log("対話相手のスクリーンの幅（送信後） = " + otherUserWindowInfo.screenWidth);  // デバッグ用
+        console.log("対話相手のスクリーンの高さ（送信後） = " + otherUserWindowInfo.screenHeight);  // デバッグ用
 
         // console.log("相手のデータを受信しました！");
       });
