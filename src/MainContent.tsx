@@ -458,10 +458,11 @@ export const MainContent = () => {
       // callbackで受信座標を反映する
       otherUserDataStream.onData.add((args) => {
         setOtherUserWindowInfo(args as WindowInfo);
+        console.log("対話相手から送られてきた情報 = " + args);
         // 対話相手のスクリーン情報の初期化
         InitOtherScreenInfo(otherUserWindowInfo.screenWidth, otherUserWindowInfo.screenHeight, otherUserWindowInfo.scrollX, otherUserWindowInfo.scrollY);
-        console.log("対話相手のスクリーンの幅（送信後） = " + otherUserWindowInfo.screenWidth);  // デバッグ用
-        console.log("対話相手のスクリーンの高さ（送信後） = " + otherUserWindowInfo.screenHeight);  // デバッグ用
+        console.log("対話相手のスクリーンの幅（送信後） = " + screenOtherWidth);  // デバッグ用
+        console.log("対話相手のスクリーンの高さ（送信後） = " + screenOtherHeight);  // デバッグ用
 
         // console.log("相手のデータを受信しました！");
       });
