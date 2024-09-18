@@ -337,67 +337,72 @@ export const MainContent = () => {
 
   /** 検出結果（フレーム毎に呼び出される） */
   const onResults = useCallback((results: Results) => {
-    // 検出結果の格納
-    resultsRef.current = results;
+    console.log(results);
 
-    // 頭部方向の取得
-    let landmarks_pos_x: number[] = []  // 468個の点のx座標を格納するリスト
-    let landmarks_pos_y: number[] = []  // 468個の点のy座標を格納するリスト
-    let face_center_default_pos: number[] = []  // 正面を向いた時の顔の中心点（ここでは，飯塚さんの修論に倣って，鼻の先の座標としている．）
-    if (results.multiFaceLandmarks && results.multiFaceLandmarks[0]) {
-      for (let id = 0; id < results.multiFaceLandmarks[0].length; id++) {
-        // 特定の顔の点を取得（x座標）
-        if (results.multiFaceLandmarks[0][id].x < 0) landmarks_pos_x.push(0);
-        else if (results.multiFaceLandmarks[0][id].x > 1) landmarks_pos_x.push(1);
-        else landmarks_pos_x.push(results.multiFaceLandmarks[0][id].x);
+    // 顔の座標が正しく取得できている時のみ実行
+    if (results.multiFaceLandmarks.length > 0) {
+      // 検出結果の格納
+      resultsRef.current = results;
 
-        // 特定の顔の点を取得（y座標）
-        if (results.multiFaceLandmarks[0][id].y < 0) landmarks_pos_y.push(0);
-        else if (results.multiFaceLandmarks[0][id].y > 1) landmarks_pos_y.push(1);
-        else landmarks_pos_y.push(results.multiFaceLandmarks[0][id].y);
+      // 頭部方向の取得
+      let landmarks_pos_x: number[] = []  // 468個の点のx座標を格納するリスト
+      let landmarks_pos_y: number[] = []  // 468個の点のy座標を格納するリスト
+      let face_center_default_pos: number[] = []  // 正面を向いた時の顔の中心点（ここでは，飯塚さんの修論に倣って，鼻の先の座標としている．）
+      if (results.multiFaceLandmarks && results.multiFaceLandmarks[0]) {
+        for (let id = 0; id < results.multiFaceLandmarks[0].length; id++) {
+          // 特定の顔の点を取得（x座標）
+          if (results.multiFaceLandmarks[0][id].x < 0) landmarks_pos_x.push(0);
+          else if (results.multiFaceLandmarks[0][id].x > 1) landmarks_pos_x.push(1);
+          else landmarks_pos_x.push(results.multiFaceLandmarks[0][id].x);
 
-        // 正面を向いた時の顔の中心点を取得（x，y座標）
-        if (id === 1) {
-          // x座標
-          if (results.multiFaceLandmarks[0][id].x < 0) face_center_default_pos.push(0);
-          else if (results.multiFaceLandmarks[0][id].x > 1) face_center_default_pos.push(1);
-          else face_center_default_pos.push(results.multiFaceLandmarks[0][id].x);
+          // 特定の顔の点を取得（y座標）
+          if (results.multiFaceLandmarks[0][id].y < 0) landmarks_pos_y.push(0);
+          else if (results.multiFaceLandmarks[0][id].y > 1) landmarks_pos_y.push(1);
+          else landmarks_pos_y.push(results.multiFaceLandmarks[0][id].y);
 
-          // y座標
-          if (results.multiFaceLandmarks[0][id].y < 0) face_center_default_pos.push(0);
-          else if (results.multiFaceLandmarks[0][id].y > 1) face_center_default_pos.push(1);
-          else face_center_default_pos.push(results.multiFaceLandmarks[0][id].y);
+          // 正面を向いた時の顔の中心点を取得（x，y座標）
+          if (id === 1) {
+            // x座標
+            if (results.multiFaceLandmarks[0][id].x < 0) face_center_default_pos.push(0);
+            else if (results.multiFaceLandmarks[0][id].x > 1) face_center_default_pos.push(1);
+            else face_center_default_pos.push(results.multiFaceLandmarks[0][id].x);
+
+            // y座標
+            if (results.multiFaceLandmarks[0][id].y < 0) face_center_default_pos.push(0);
+            else if (results.multiFaceLandmarks[0][id].y > 1) face_center_default_pos.push(1);
+            else face_center_default_pos.push(results.multiFaceLandmarks[0][id].y);
+          }
         }
       }
+      // 顔の中心点の座標
+      const face_center_pos = [Average_value(landmarks_pos_x), Average_value(landmarks_pos_y)];
+      // 頭部方向を計算するためのベクトル
+      const base_vector = [1,0];
+      // 顔の中心点を原点とした時の，正面を向いた際の顔の中心点のベクトル
+      const fc_d_from_fc_vector = [face_center_default_pos[0] - face_center_pos[0], face_center_default_pos[1] - face_center_pos[1]];
+      // console.log("face_center_pos = " + face_center_default_pos);
+      // console.log("face_center_default_pos = " + face_center_default_pos);
+      // console.log("fc_d_from_fc_vector = " + fc_d_from_fc_vector);
+      
+      // 頭部方向（ラジアン）
+      let rad_head_direction = Math.acos(Inner(base_vector, fc_d_from_fc_vector) / (Norm(base_vector) * Norm(fc_d_from_fc_vector)));
+      // 頭部方向（度）
+      // let theta_head_direction = rad_head_direction * (180 / Math.PI);
+      // arccosの値域が0～πであるため，上下の区別をするために，上を向いている時には，ラジアンおよび度の値を更新する
+      if (fc_d_from_fc_vector[1] < 0) {
+        rad_head_direction = -rad_head_direction;
+        // theta_head_direction = Math.PI * 2 - theta_head_direction;
+      }
+      // console.log("theta_head_direction = " + theta_head_direction);
+      // console.log("diff_top = " + distance_rate_move * Norm(fc_d_from_fc_vector) * Math.sin(rad_head_direction));
+      // console.log("diff_left = " + distance_rate_move * Norm(fc_d_from_fc_vector) * Math.cos(rad_head_direction));
+
+      // widthの範囲：50~500？
+      // 要検討：ウィンドウの動きとユーザの実際の動きを合わせるために，左右反転させる？
+      // 自分自身のスクリーンに対するビデオウィンドウの位置の更新（index = 0：自分自身側のスクリーン基準，index = 1：対話相手側のスクリーン基準）
+      setMyWindowInfo(pre => setWindowInfo(fc_d_from_fc_vector, rad_head_direction, screenMyWidth, screenMyHeight, scrollMyX, scrollMyY, 0));
+      setMyWindowInfo_based_on_OtherScreen(pre => setWindowInfo(fc_d_from_fc_vector, rad_head_direction, screenOtherWidth, screenOtherHeight, scrollOtherX, scrollOtherY, 1));
     }
-    // 顔の中心点の座標
-    const face_center_pos = [Average_value(landmarks_pos_x), Average_value(landmarks_pos_y)];
-    // 頭部方向を計算するためのベクトル
-    const base_vector = [1,0];
-    // 顔の中心点を原点とした時の，正面を向いた際の顔の中心点のベクトル
-    const fc_d_from_fc_vector = [face_center_default_pos[0] - face_center_pos[0], face_center_default_pos[1] - face_center_pos[1]];
-    // console.log("face_center_pos = " + face_center_default_pos);
-    // console.log("face_center_default_pos = " + face_center_default_pos);
-    // console.log("fc_d_from_fc_vector = " + fc_d_from_fc_vector);
-    
-    // 頭部方向（ラジアン）
-    let rad_head_direction = Math.acos(Inner(base_vector, fc_d_from_fc_vector) / (Norm(base_vector) * Norm(fc_d_from_fc_vector)));
-    // 頭部方向（度）
-    // let theta_head_direction = rad_head_direction * (180 / Math.PI);
-    // arccosの値域が0～πであるため，上下の区別をするために，上を向いている時には，ラジアンおよび度の値を更新する
-    if (fc_d_from_fc_vector[1] < 0) {
-      rad_head_direction = -rad_head_direction;
-      // theta_head_direction = Math.PI * 2 - theta_head_direction;
-    }
-    // console.log("theta_head_direction = " + theta_head_direction);
-    // console.log("diff_top = " + distance_rate_move * Norm(fc_d_from_fc_vector) * Math.sin(rad_head_direction));
-    // console.log("diff_left = " + distance_rate_move * Norm(fc_d_from_fc_vector) * Math.cos(rad_head_direction));
-    
-    // widthの範囲：50~500？
-    // 要検討：ウィンドウの動きとユーザの実際の動きを合わせるために，左右反転させる？
-    // 自分自身のスクリーンに対するビデオウィンドウの位置の更新（index = 0：自分自身側のスクリーン基準，index = 1：対話相手側のスクリーン基準）
-    setMyWindowInfo(pre => setWindowInfo(fc_d_from_fc_vector, rad_head_direction, screenMyWidth, screenMyHeight, scrollMyX, scrollMyY, 0));
-    setMyWindowInfo_based_on_OtherScreen(pre => setWindowInfo(fc_d_from_fc_vector, rad_head_direction, screenOtherWidth, screenOtherHeight, scrollOtherX, scrollOtherY, 1));
   },[]);
 
   useEffect(() => {
