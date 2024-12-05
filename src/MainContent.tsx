@@ -72,7 +72,7 @@ let scrollOtherX = window.scrollX;
 let scrollOtherY = window.scrollY;
 
 // ビデオウィンドウの大きさの最小値・最大値
-const width_min = 50;
+const width_min = 100;
 const width_max = 500;
 // 移動量の拡大率
 const distance_rate_move = 10000;
@@ -350,6 +350,7 @@ export const MainContent = () => {
       let landmarks_pos_x: number[] = []  // 468個の点のx座標を格納するリスト
       let landmarks_pos_y: number[] = []  // 468個の点のy座標を格納するリスト
       let face_center_default_pos: number[] = []  // 正面を向いた時の顔の中心点（ここでは，飯塚さんの修論に倣って，鼻の先の座標としている．）
+      // const Start_OnePoint = performance.now();  // 1点の処理の開始時刻
       if (results.multiFaceLandmarks && results.multiFaceLandmarks[0]) {
         for (let id = 0; id < results.multiFaceLandmarks[0].length; id++) {
           // 特定の顔の点を取得（x座標）
@@ -378,6 +379,8 @@ export const MainContent = () => {
       }
       // 顔の中心点の座標
       const face_center_pos = [Average_value(landmarks_pos_x), Average_value(landmarks_pos_y)];
+      // const End_OnePoint = performance.now();  // 1点の処理の終了時刻
+      // console.log("処理時間：" + (End_OnePoint - Start_OnePoint) + "ミリ秒");  
       // 頭部方向を計算するためのベクトル
       const base_vector = [1,0];
       // 顔の中心点を原点とした時の，正面を向いた際の顔の中心点のベクトル
