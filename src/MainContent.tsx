@@ -276,10 +276,12 @@ export const MainContent = () => {
     video: LocalVideoStream;
   }>();
   const [ localDataStream, setLocalDataStream ] = useState<LocalDataStream>();
+  // eslint-disable-next-line
   // console.log(localDataStream);
   // me.subscribe(publication.id) の戻り値に含まれる stream
   // (contentType === "data" のもの)
   const [ otherUserDataStream, setOtherUserDataStream ] = useState<RemoteDataStream>();
+  // eslint-disable-next-line
   // console.log(otherUserDataStream);
 
   // tokenとvideo要素の参照ができたら実行
@@ -300,6 +302,7 @@ export const MainContent = () => {
     };
 
     initialize();
+    // eslint-disable-next-line
     // console.log("初期化がされました！");
   }, [token, localVideo]);
 
@@ -324,11 +327,13 @@ export const MainContent = () => {
 
   // myWindowPositionが更新された時の処理
   useEffect(() => {
+    // eslint-disable-next-line
     // console.log("自分のデータ送信中...");
     if (localDataStream != null) {
       localDataStream.write(myWindowInfo_based_on_OtherScreen);
       console.log("対話相手のスクリーンの幅（送信前） = " + myWindowInfo_based_on_OtherScreen.screenWidth);  // デバッグ用
       console.log("対話相手のスクリーンの高さ（送信前） = " + myWindowInfo_based_on_OtherScreen.screenHeight);  // デバッグ用
+      // eslint-disable-next-line
       // console.log("自分のデータを送信しました！");
     }
   }, [ myWindowInfo_based_on_OtherScreen ]);
@@ -339,6 +344,7 @@ export const MainContent = () => {
 
   /** 検出結果（フレーム毎に呼び出される） */
   const onResults = useCallback((results: Results) => {
+    // eslint-disable-next-line
     // console.log(results);  // デバッグ用
 
     // 顔の座標が正しく取得できている時のみ実行
@@ -380,13 +386,17 @@ export const MainContent = () => {
       // 顔の中心点の座標
       const face_center_pos = [Average_value(landmarks_pos_x), Average_value(landmarks_pos_y)];
       // const End_OnePoint = performance.now();  // 1点の処理の終了時刻
+      // eslint-disable-next-line
       // console.log("処理時間：" + (End_OnePoint - Start_OnePoint) + "ミリ秒");  
       // 頭部方向を計算するためのベクトル
       const base_vector = [1,0];
       // 顔の中心点を原点とした時の，正面を向いた際の顔の中心点のベクトル
       const fc_d_from_fc_vector = [face_center_default_pos[0] - face_center_pos[0], face_center_default_pos[1] - face_center_pos[1]];
+      // eslint-disable-next-line
       // console.log("face_center_pos = " + face_center_default_pos);
+      // eslint-disable-next-line
       // console.log("face_center_default_pos = " + face_center_default_pos);
+      // eslint-disable-next-line
       // console.log("fc_d_from_fc_vector = " + fc_d_from_fc_vector);
       
       // 頭部方向（ラジアン）
@@ -398,8 +408,11 @@ export const MainContent = () => {
         rad_head_direction = -rad_head_direction;
         // theta_head_direction = Math.PI * 2 - theta_head_direction;
       }
+      // eslint-disable-next-line
       // console.log("theta_head_direction = " + theta_head_direction);
+      // eslint-disable-next-line
       // console.log("diff_top = " + distance_rate_move * Norm(fc_d_from_fc_vector) * Math.sin(rad_head_direction));
+      // eslint-disable-next-line
       // console.log("diff_left = " + distance_rate_move * Norm(fc_d_from_fc_vector) * Math.cos(rad_head_direction));
 
       // widthの範囲：50~500？
@@ -456,19 +469,25 @@ export const MainContent = () => {
   }), [ otherUserWindowInfo ]);
 
   useEffect(() => {
+    // eslint-disable-next-line
     // console.log("相手のデータ受信設定");
     if (otherUserDataStream != null) {
       // callbackで受信座標を反映する
       otherUserDataStream.onData.add((args) => {
         setOtherUserWindowInfo(args as WindowInfo);
-        console.log("bbb");
-        console.log("sss");
-        console.log(args);
+        // eslint-disable-next-line
+        // console.log("bbb");
+        // eslint-disable-next-line
+        // console.log("sss");
+        // eslint-disable-next-line
+        // console.log(args);
         // 対話相手のスクリーン情報の初期化
         InitOtherScreenInfo(otherUserWindowInfo.screenWidth, otherUserWindowInfo.screenHeight, otherUserWindowInfo.scrollX, otherUserWindowInfo.scrollY);
-        console.log("対話相手のスクリーンの幅（送信後） = " + screenOtherWidth);  // デバッグ用
-        console.log("対話相手のスクリーンの高さ（送信後） = " + screenOtherHeight);  // デバッグ用
-
+        // eslint-disable-next-line
+        // console.log("対話相手のスクリーンの幅（送信後） = " + screenOtherWidth);  // デバッグ用
+        // eslint-disable-next-line
+        // console.log("対話相手のスクリーンの高さ（送信後） = " + screenOtherHeight);  // デバッグ用
+        // eslint-disable-next-line
         // console.log("相手のデータを受信しました！");
       });
     }
@@ -505,13 +524,15 @@ export const MainContent = () => {
     await me.publish(localStream.video);
     await me.publish(localStream.audio);
     if (localDataStream !== undefined) {
-      console.log("published data stream");
+      // eslint-disable-next-line
+      // console.log("published data stream");
       await me.publish(localDataStream);
     }
 
     // 自分以外の参加者情報を取得
     const otherPublifications = room.publications.filter(p => p.publisher.id !== me.id);
     setOtherUserPublications(otherPublifications);
+    // eslint-disable-next-line
     // console.log(otherPublifications);
     for (let i = 0; i < otherPublifications.length; i++) {
       if (otherPublifications[i].contentType === "data") {
@@ -528,13 +549,16 @@ export const MainContent = () => {
         setOtherUserPublications(pre => [ ...pre, e.publication ]);
       }
 
-      console.log(e);
+      // eslint-disable-next-line
+      // console.log(e);
       if (e.publication.contentType === "data" && e.publication.publisher.id !== me.id) {
-        console.log("DataStreamを購読しました！");
+        // eslint-disable-next-line
+        // console.log("DataStreamを購読しました！");
         const { stream } = await me.subscribe(e.publication.id);
         // ここは必ずRemoteDataStreamになるはず
         if (stream.contentType === "data") {
-          console.log("!!!!!!!!!", stream);
+          // eslint-disable-next-line
+          // console.log("!!!!!!!!!", stream);
           setOtherUserDataStream(stream);
           // データ受信時のcallbackを登録
           // const { removeListener } = stream.onData.add((data) => setOtherUserWindowPosition(data as WindowPosition));
