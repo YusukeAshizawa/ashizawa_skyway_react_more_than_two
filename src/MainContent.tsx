@@ -6,11 +6,16 @@ import { FaceMesh, Results } from '@mediapipe/face_mesh';
 import { Camera } from "@mediapipe/camera_utils";
 import Webcam from "react-webcam";
 
+// ビデオウィンドウの情報
 interface WindowInfo {
     top_diff: number;  // 位置を移動させる場合の上下方向の変化量
     left_diff: number;  // 位置を移動させる場合の左右方向の変化量
     width: number;
     height: number;  // heightはwidthのHeightPerWidthRate倍
+    border_r: number;  // ビデオウィンドウの枠の色（赤）の値
+    border_g: number;  // ビデオウィンドウの枠の色（緑）の値
+    border_b: number;  // ビデオウィンドウの枠の色（青）の値
+    border_a: number;  // ビデオウィンドウの枠の色の透明度の値
 }
 
 // 数値型リストの要素の平均値を求める関数
@@ -45,9 +50,10 @@ function Norm(number_list: number[]) {
 // 移動平均計算時のフレーム数
 const MovingAverage_frame = 20;
 // 移動平均計算用の配列
-let move_top_diffs: number[][] = [[],[]];
-let move_left_diffs: number[][] = [[],[]];
-let move_width: number[][] = [[],[]];
+let move_top_diffs: number[] = [];
+let move_left_diffs: number[] = [];
+let move_width: number[] = [];
+let move_border_a: number[] = [];
 
 // 条件ID（1: Baseline, 2: PositionChange, 3: SizeChange, 4: PositionAndSizeChange）
 let condition_ID = 1;
@@ -71,35 +77,67 @@ const distance_rate_move = 10000;
 const default_width = (width_min + width_max) / 2;
 const HeightPerWidthRate = 0.75;
 
+// 位置の移動を行う場合の，スクリーンの中心からのずれ
 const default_top_diff = 0;
 const default_left_diff = 0;
 
+// ビデオウィンドウの枠の色の値
+const default_border_r = 83;
+const default_border_g = 253;
+const default_border_b = 49;
+const default_border_a = 0;
+
+// ビデオウィンドウの枠の色の最小値・最大値
+const border_a_min = 0;
+const border_a_max = 1;
+
+// ビデオウィンドウの枠の色を完全に透明にする時の閾値
+const border_a_min_threshold = 0.015;
+
 // ビデオウィンドウのInfoの更新（index = 0：参加者自身のビデオウィンドウ，index = 1：対話相手のビデオウィンドウ）
-function setWindowInfo(fc_d_from_fc_vector: number[], rad_head_direction: number, screen_Width: number, screen_Height: number, scroll_X: number, scroll_Y: number, index: number) {
+function setWindowInfo(fc_d_from_fc_vector: number[], rad_head_direction: number, screen_Width: number, screen_Height: number, scroll_X: number, scroll_Y: number) {
   // ウィンドウの大きさの最大値に対する，実際のウィンドウの大きさの比率
   let next_width_rate = 0;
-  // 顔の中心点を原点とした時の，正面を向いた際の顔の中心点のベクトルの長さによって，ウィンドウの大きさを変更
+  // ビデオウィンドウの枠の色の透明度の比率
+  let next_border_a_rate = 0;
+  // 顔の中心点を原点とした時の，正面を向いた際の顔の中心点のベクトルの長さによって，ウィンドウの大きさ・ビデオウィンドウの枠の色の透明度を変更
   if (150 * Norm(fc_d_from_fc_vector) <= 1) {
     next_width_rate = 1;
+    next_border_a_rate = 1;
   }
   else {
     next_width_rate = 1 / (150 * Norm(fc_d_from_fc_vector));
+    next_border_a_rate = 1 / (150 * Norm(fc_d_from_fc_vector));
   }
 
   // ウィンドウの大きさを踏まえて，ウィンドウの位置を決めるため，ウィンドウの大きさ → ウィンドウの位置の順に算出する
   // 1. ウィンドウの大きさの算出
-  let width_value = width_max * (next_width_rate);
+  let width_value = width_max * next_width_rate;
 
-  // 移動平均を導入するために，値を保存
-  move_width[index].push(width_value);
+  // ビデオウィンドウの枠の色の透明度の変更
+  let border_a_value = border_a_max * next_border_a_rate;
 
-  if (move_width[index].length < 10) width_value = Average_value(move_width[index], 0, move_width[index].length - 1);
+  // 移動平均を導入するために，値を保存（ビデオウィンドウの大きさ・ビデオウィンドウの枠の色の透明度）
+  move_width.push(width_value);
+  move_border_a.push(border_a_value);
+
+  // 移動平均の計算 + リストの肥大化の防止（ビデオウィンドウの大きさ）
+  if (move_width.length < MovingAverage_frame) width_value = Average_value(move_width, 0, move_width.length - 1);
   else{
-    if (move_width[index].length > MovingAverage_frame + 10) move_width[index].shift();
-    width_value = Average_value(move_width[index], move_width[index].length - MovingAverage_frame, move_width[index].length - 1);
+    if (move_width.length > MovingAverage_frame + 10) move_width.shift();
+    width_value = Average_value(move_width, move_width.length - MovingAverage_frame, move_width.length - 1);
   }
 
+  // 移動平均の計算 + リストの肥大化の防止（ビデオウィンドウの大きさ）
+  if (move_border_a.length < MovingAverage_frame) border_a_value = Average_value(move_border_a, 0, move_border_a.length - 1);
+  else{
+    if (move_border_a.length > MovingAverage_frame + 10) move_border_a.shift();
+    border_a_value = Average_value(move_border_a, move_border_a.length - MovingAverage_frame, move_border_a.length - 1);
+  }
+
+  // 最小値の考慮（ビデオウィンドウの大きさ・ビデオウィンドウの枠の色の透明度）
   if (width_value < width_min) width_value = width_min;
+  if (border_a_value < border_a_min_threshold) border_a_value = border_a_min;
 
   // PositionChange条件の時には，top・leftの値にwidth_valueの値が影響を与えないようにするために，width_valueの値を更新
   if (condition_ID === 2) width_value = default_width;
@@ -108,21 +146,20 @@ function setWindowInfo(fc_d_from_fc_vector: number[], rad_head_direction: number
   let top_diff_value = distance_rate_move * Norm(fc_d_from_fc_vector) * Math.sin(rad_head_direction) - width_value/2;
   let left_diff_value = distance_rate_move * Norm(fc_d_from_fc_vector) * Math.cos(rad_head_direction - Math.PI) - width_value/2;
 
-  // 移動平均を導入するために，値を保存
-  move_top_diffs[index].push(top_diff_value);
-  move_left_diffs[index].push(left_diff_value);
+  // 移動平均を導入するために，値を保存（ビデオウィンドウのスクリーン中心からのずれ）
+  move_top_diffs.push(top_diff_value);
+  move_left_diffs.push(left_diff_value);
 
-  // 移動平均の計算 + リストの肥大化の防止
-  if (move_top_diffs[index].length < 10) top_diff_value = Average_value(move_top_diffs[index], 0, move_top_diffs[index].length - 1);
+  // 移動平均の計算 + リストの肥大化の防止（ビデオウィンドウのスクリーン中心からのずれ）
+  if (move_top_diffs.length < MovingAverage_frame) top_diff_value = Average_value(move_top_diffs, 0, move_top_diffs.length - 1);
   else{
-    if (move_top_diffs[index].length > MovingAverage_frame + 10) move_top_diffs[index].shift();
-    top_diff_value = Average_value(move_top_diffs[index], move_top_diffs[index].length - MovingAverage_frame, move_top_diffs[index].length - 1);
+    if (move_top_diffs.length > MovingAverage_frame + 10) move_top_diffs.shift();
+    top_diff_value = Average_value(move_top_diffs, move_top_diffs.length - MovingAverage_frame, move_top_diffs.length - 1);
   }
-
-  if (move_left_diffs[index].length < 10) left_diff_value = Average_value(move_left_diffs[index], 0, move_left_diffs[index].length - 1);
+  if (move_left_diffs.length < MovingAverage_frame) left_diff_value = Average_value(move_left_diffs, 0, move_left_diffs.length - 1);
   else{
-    if (move_left_diffs[index].length > MovingAverage_frame + 10) move_left_diffs[index].shift();
-    left_diff_value = Average_value(move_left_diffs[index], move_left_diffs[index].length - MovingAverage_frame, move_left_diffs[index].length - 1);
+    if (move_left_diffs.length > MovingAverage_frame + 10) move_left_diffs.shift();
+    left_diff_value = Average_value(move_left_diffs, move_left_diffs.length - MovingAverage_frame, move_left_diffs.length - 1);
   }
 
   let newInfo: WindowInfo;
@@ -133,7 +170,11 @@ function setWindowInfo(fc_d_from_fc_vector: number[], rad_head_direction: number
         top_diff: default_top_diff,
         left_diff: default_left_diff,
         width: default_width,
-        height: default_width * HeightPerWidthRate
+        height: default_width * HeightPerWidthRate,
+        border_r: default_border_r,
+        border_g: default_border_g,
+        border_b: default_border_b,
+        border_a: default_border_a
       };
       break;
     case 2:  // PositionChange条件
@@ -141,7 +182,11 @@ function setWindowInfo(fc_d_from_fc_vector: number[], rad_head_direction: number
         top_diff: top_diff_value,
         left_diff: left_diff_value,
         width: default_width,
-        height: default_width * HeightPerWidthRate
+        height: default_width * HeightPerWidthRate,
+        border_r: default_border_r,
+        border_g: default_border_g,
+        border_b: default_border_b,
+        border_a: default_border_a
       };
       break;
     case 3:  // SizeChange条件
@@ -149,7 +194,11 @@ function setWindowInfo(fc_d_from_fc_vector: number[], rad_head_direction: number
         top_diff: default_top_diff,
         left_diff: default_left_diff,
         width: width_value,
-        height: width_value * HeightPerWidthRate
+        height: width_value * HeightPerWidthRate,
+        border_r: default_border_r,
+        border_g: default_border_g,
+        border_b: default_border_b,
+        border_a: default_border_a
       };
       break;
     case 4:  // PositionAndChange条件
@@ -157,15 +206,35 @@ function setWindowInfo(fc_d_from_fc_vector: number[], rad_head_direction: number
         top_diff: top_diff_value,
         left_diff: left_diff_value,
         width: width_value,
-        height: width_value * HeightPerWidthRate
+        height: width_value * HeightPerWidthRate,
+        border_r: default_border_r,
+        border_g: default_border_g,
+        border_b: default_border_b,
+        border_a: default_border_a
       };
+      break;
+    case 5:  // BorderColorChange条件
+      newInfo = {
+        top_diff: default_top_diff,
+        left_diff: default_left_diff,
+        width: default_width,
+        height: default_width * HeightPerWidthRate,
+        border_r: default_border_r,
+        border_g: default_border_g,
+        border_b: default_border_b,
+        border_a: border_a_value
+      }
       break;
     default:  // Baseline条件
       newInfo = {
         top_diff: default_top_diff,
         left_diff: default_left_diff,
         width: default_width,
-        height: default_width * HeightPerWidthRate
+        height: default_width * HeightPerWidthRate,
+        border_r: default_border_r,
+        border_g: default_border_g,
+        border_b: default_border_b,
+        border_a: default_border_a
       };
       break;
   }
@@ -264,7 +333,8 @@ export const MainContent = () => {
 
   // 自分自身のウィンドウの位置・大きさの調整
   const [ myWindowInfo, setMyWindowInfo ] = useState<WindowInfo>({ 
-    top_diff: default_top_diff, left_diff: default_left_diff, width: default_width, height: default_width * HeightPerWidthRate
+    top_diff: default_top_diff, left_diff: default_left_diff, width: default_width, height: default_width * HeightPerWidthRate, 
+    border_r: default_border_r, border_g: default_border_g, border_b: default_border_b, border_a: default_border_a
   });
 
   // フィールド領域をはみ出ないように調整を入れる
@@ -276,7 +346,8 @@ export const MainContent = () => {
       left: scrollMyX + screenMyWidth / 2 - myWindowInfo.width / 2 + myWindowInfo.left_diff < 0 ? 0 :
             scrollMyX + screenMyWidth / 2 - myWindowInfo.width / 2 + myWindowInfo.left_diff > screenMyWidth - myWindowInfo.width / 2 ? screenMyWidth - myWindowInfo.width : 
             scrollMyX + screenMyWidth / 2 - myWindowInfo.width / 2 + myWindowInfo.left_diff,
-      width: myWindowInfo.width
+      width: myWindowInfo.width,
+      border: `10px solid rgba(${myWindowInfo.border_r}, ${myWindowInfo.border_g}, ${myWindowInfo.border_b}, ${myWindowInfo.border_a})`
   }), [ myWindowInfo ]);
 
   // myWindowPositionが更新された時の処理
@@ -370,7 +441,7 @@ export const MainContent = () => {
       // widthの範囲：50~500？
       // 要検討：ウィンドウの動きとユーザの実際の動きを合わせるために，左右反転させる？
       // 自分自身のスクリーンに対するビデオウィンドウの位置の更新（index = 0：自分自身側のスクリーン基準，index = 1：対話相手側のスクリーン基準）
-      setMyWindowInfo(pre => setWindowInfo(fc_d_from_fc_vector, rad_head_direction, screenMyWidth, screenMyHeight, scrollMyX, scrollMyY, 0));
+      setMyWindowInfo(pre => setWindowInfo(fc_d_from_fc_vector, rad_head_direction, screenMyWidth, screenMyHeight, scrollMyX, scrollMyY));
     }
   },[]);
 
@@ -407,7 +478,8 @@ export const MainContent = () => {
   // 他ユーザの座標情報を保持
   // （これを自分のアイコンと同様に画面表示用のstyleに反映する）
   const [ otherUserWindowInfo, setOtherUserWindowInfo ] = useState<WindowInfo>({
-    top_diff: default_top_diff, left_diff: default_left_diff, width: default_width, height: default_width * HeightPerWidthRate
+    top_diff: default_top_diff, left_diff: default_left_diff, width: default_width, height: default_width * HeightPerWidthRate,
+    border_r: default_border_r, border_g: default_border_g, border_b: default_border_b, border_a: default_border_a
    });
 
   // 他ユーザのウィンドウの位置・大きさの変更
@@ -420,7 +492,8 @@ export const MainContent = () => {
     left: scrollMyX + screenMyWidth / 2 - otherUserWindowInfo.width / 2 + otherUserWindowInfo.left_diff < 0 ? 0 :
           scrollMyX + screenMyWidth / 2 - otherUserWindowInfo.width / 2 + otherUserWindowInfo.left_diff > screenMyWidth - otherUserWindowInfo.width / 2 ? screenMyWidth - otherUserWindowInfo.width : 
           scrollMyX + screenMyWidth / 2 - otherUserWindowInfo.width / 2 + otherUserWindowInfo.left_diff,
-    width: otherUserWindowInfo.width
+    width: otherUserWindowInfo.width,
+    border: `10px solid rgba(${otherUserWindowInfo.border_r}, ${otherUserWindowInfo.border_g}, ${otherUserWindowInfo.border_b}, ${otherUserWindowInfo.border_a})`
   }), [ otherUserWindowInfo ]);
 
   useEffect(() => {
@@ -548,15 +621,19 @@ export const MainContent = () => {
             case 4:
               condition_name = "PositionAndSizeChange";
               break;
+            case 5:
+              condition_name = "BorderColorChange";
+              break;
             default:
               condition_name = "";
               break;
           }
         }}>
           <option value="1">Baseline</option>
-          <option value="2">PositionChange</option>
+          {/* <option value="2">PositionChange</option> */}
           <option value="3">SizeChange</option>
-          <option value="4">PositionAndSizeChange</option>
+          {/* <option value="4">PositionAndSizeChange</option> */}
+          <option value="5">BorderColorChange</option>
         </select>　
         {/* ID: {me?.id ?? ""} */}
         </p>

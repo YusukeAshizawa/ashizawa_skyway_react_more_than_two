@@ -20,10 +20,12 @@
   max-width: 1000px;  /*ウィンドウの横幅の最大値*/
   max-height: 1000px;  /*ウィンドウの縦幅の最大値*/
   display: none;
+  border: 10px solid rgba(255, 255, 255, 0);
 }
 
 /* 相手側のウィンドウの大きさを調整 */
 #remote-video {
   max-width: 1000px;  /*ウィンドウの横幅の最大値*/
   max-height: 1000px;  /*ウィンドウの縦幅の最大値*/
+  border: 10px solid rgba(255, 255, 255, 0);
 }
