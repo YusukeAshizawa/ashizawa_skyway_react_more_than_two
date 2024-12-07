@@ -11,10 +11,6 @@ interface WindowInfo {
     left_diff: number;  // 位置を移動させる場合の左右方向の変化量
     width: number;
     height: number;  // heightはwidthのHeightPerWidthRate倍
-    screenWidth: number;
-    screenHeight: number;
-    scrollX: number;
-    scrollY: number;
 }
 
 // 数値型リストの要素の平均値を求める関数
@@ -64,13 +60,6 @@ let screenMyHeight = window.innerHeight;
 // ブラウザウィンドウの左上の位置を取得（参加者側）
 let scrollMyX = window.scrollX;
 let scrollMyY = window.scrollY;
-
-// スクリーンの幅・高さ（対話相手側）
-let screenOtherWidth = window.innerWidth;
-let screenOtherHeight = window.innerHeight;
-// スクロール位置を取得（対話相手側）
-let scrollOtherX = window.scrollX;
-let scrollOtherY = window.scrollY;
 
 // ビデオウィンドウの大きさの最小値・最大値
 const width_min = 100;
@@ -144,11 +133,7 @@ function setWindowInfo(fc_d_from_fc_vector: number[], rad_head_direction: number
         top_diff: default_top_diff,
         left_diff: default_left_diff,
         width: default_width,
-        height: default_width * HeightPerWidthRate,
-        screenWidth: screen_Width,
-        screenHeight: screen_Height,
-        scrollX: scroll_X,
-        scrollY: scroll_Y
+        height: default_width * HeightPerWidthRate
       };
       break;
     case 2:  // PositionChange条件
@@ -156,11 +141,7 @@ function setWindowInfo(fc_d_from_fc_vector: number[], rad_head_direction: number
         top_diff: top_diff_value,
         left_diff: left_diff_value,
         width: default_width,
-        height: default_width * HeightPerWidthRate,
-        screenWidth: screen_Width,
-        screenHeight: screen_Height,
-        scrollX: scroll_X,
-        scrollY: scroll_Y
+        height: default_width * HeightPerWidthRate
       };
       break;
     case 3:  // SizeChange条件
@@ -168,11 +149,7 @@ function setWindowInfo(fc_d_from_fc_vector: number[], rad_head_direction: number
         top_diff: default_top_diff,
         left_diff: default_left_diff,
         width: width_value,
-        height: width_value * HeightPerWidthRate,
-        screenWidth: screen_Width,
-        screenHeight: screen_Height,
-        scrollX: scroll_X,
-        scrollY: scroll_Y
+        height: width_value * HeightPerWidthRate
       };
       break;
     case 4:  // PositionAndChange条件
@@ -180,11 +157,7 @@ function setWindowInfo(fc_d_from_fc_vector: number[], rad_head_direction: number
         top_diff: top_diff_value,
         left_diff: left_diff_value,
         width: width_value,
-        height: width_value * HeightPerWidthRate,
-        screenWidth: screen_Width,
-        screenHeight: screen_Height,
-        scrollX: scroll_X,
-        scrollY: scroll_Y
+        height: width_value * HeightPerWidthRate
       };
       break;
     default:  // Baseline条件
@@ -192,11 +165,7 @@ function setWindowInfo(fc_d_from_fc_vector: number[], rad_head_direction: number
         top_diff: default_top_diff,
         left_diff: default_left_diff,
         width: default_width,
-        height: default_width * HeightPerWidthRate,
-        screenWidth: screen_Width,
-        screenHeight: screen_Height,
-        scrollX: scroll_X,
-        scrollY: scroll_Y
+        height: default_width * HeightPerWidthRate
       };
       break;
   }
@@ -295,8 +264,7 @@ export const MainContent = () => {
 
   // 自分自身のウィンドウの位置・大きさの調整
   const [ myWindowInfo, setMyWindowInfo ] = useState<WindowInfo>({ 
-    top_diff: default_top_diff, left_diff: default_left_diff, width: default_width, height: default_width * HeightPerWidthRate,
-    screenWidth: screenMyWidth, screenHeight: screenMyHeight, scrollX: scrollMyX, scrollY: scrollMyY
+    top_diff: default_top_diff, left_diff: default_left_diff, width: default_width, height: default_width * HeightPerWidthRate
   });
 
   // フィールド領域をはみ出ないように調整を入れる
@@ -439,8 +407,7 @@ export const MainContent = () => {
   // 他ユーザの座標情報を保持
   // （これを自分のアイコンと同様に画面表示用のstyleに反映する）
   const [ otherUserWindowInfo, setOtherUserWindowInfo ] = useState<WindowInfo>({
-    top_diff: default_top_diff, left_diff: default_left_diff, width: default_width, height: default_width * HeightPerWidthRate,
-    screenWidth: screenOtherWidth, screenHeight: screenOtherHeight, scrollX: scrollOtherX, scrollY: scrollOtherY
+    top_diff: default_top_diff, left_diff: default_left_diff, width: default_width, height: default_width * HeightPerWidthRate
    });
 
   // 他ユーザのウィンドウの位置・大きさの変更
