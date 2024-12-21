@@ -5,6 +5,21 @@ import "./MainContent.css"
 import { FaceMesh, Results } from '@mediapipe/face_mesh';
 import { Camera } from "@mediapipe/camera_utils";
 import Webcam from "react-webcam";
+import { CSVLink } from "react-csv";
+
+// 参加者ID
+let participantID = 1;
+// 条件番号・条件名
+let conditionID = 1;
+// 条件名
+let conditionName = "Baseline";
+// ルーム名
+let roomName = "";
+
+// CSVファイルとして書き出すデータの収集を開始するタイミングの制御
+let nowTest = false;
+// 計測スタート時間
+let startTime = 0;
 
 // ビデオウィンドウの情報
 interface WindowInfo {
@@ -16,6 +31,15 @@ interface WindowInfo {
     border_g: number;  // ビデオウィンドウの枠の色（緑）の値
     border_b: number;  // ビデオウィンドウの枠の色（青）の値
     border_a: number;  // ビデオウィンドウの枠の色の透明度の値
+}
+
+// CSVファイルに書き出す頭部方向の情報
+interface CSV_HeadDirection_Info {
+  ID: number;
+  Condition: number;
+  Time: number;
+  Theta: number;
+  myWindowWidth: number;
 }
 
 // 数値型リストの要素の平均値を求める関数
@@ -55,11 +79,6 @@ let move_left_diffs: number[] = [];
 let move_width: number[] = [];
 let move_border_a: number[] = [];
 
-// 条件ID（1: Baseline, 2: PositionChange, 3: SizeChange, 4: PositionAndSizeChange）
-let condition_ID = 1;
-// 条件名
-let condition_name = "Baseline";
-
 // スクリーンの幅・高さ（参加者側）
 let screenMyWidth = window.innerWidth;
 let screenMyHeight = window.innerHeight;
@@ -94,8 +113,11 @@ const border_a_max = 1;
 // ビデオウィンドウの枠の色を完全に透明にする時の閾値
 const border_a_min_threshold = 0.015;
 
+// ビデオウィンドウの大きさの一次保存（大きさを変更しない条件でも分析できるようにするため）
+let width_tmp_value = 0;
+
 // ビデオウィンドウのInfoの更新（index = 0：参加者自身のビデオウィンドウ，index = 1：対話相手のビデオウィンドウ）
-function setWindowInfo(fc_d_from_fc_vector: number[], rad_head_direction: number, screen_Width: number, screen_Height: number, scroll_X: number, scroll_Y: number) {
+function setWindowInfo(conditionID: number, fc_d_from_fc_vector: number[], rad_head_direction: number, screen_Width: number, screen_Height: number, scroll_X: number, scroll_Y: number) {
   // ウィンドウの大きさの最大値に対する，実際のウィンドウの大きさの比率
   let next_width_rate = 0;
   // ビデオウィンドウの枠の色の透明度の比率
@@ -139,8 +161,11 @@ function setWindowInfo(fc_d_from_fc_vector: number[], rad_head_direction: number
   if (width_value < width_min) width_value = width_min;
   if (border_a_value < border_a_min_threshold) border_a_value = border_a_min;
 
-  // PositionChange条件の時には，top・leftの値にwidth_valueの値が影響を与えないようにするために，width_valueの値を更新
-  if (condition_ID === 2) width_value = default_width;
+  // CSVファイルへの保存用
+  width_tmp_value = width_value;
+
+  // BaseLine条件・PositionChange・FrameChange条件の時には，top・leftの値にwidth_valueの値が影響を与えないようにするために，width_valueの値を更新
+  if (conditionID === 1 || conditionID === 2 || conditionID === 4) width_value = default_width;
 
   // 2. ウィンドウの位置の算出
   let top_diff_value = distance_rate_move * Norm(fc_d_from_fc_vector) * Math.sin(rad_head_direction) - width_value/2;
@@ -164,7 +189,7 @@ function setWindowInfo(fc_d_from_fc_vector: number[], rad_head_direction: number
 
   let newInfo: WindowInfo;
 
-  switch(condition_ID) {
+  switch(conditionID) {
     case 1:  // Baseline条件
       newInfo = {
         top_diff: default_top_diff,
@@ -177,17 +202,17 @@ function setWindowInfo(fc_d_from_fc_vector: number[], rad_head_direction: number
         border_a: default_border_a
       };
       break;
-    case 2:  // PositionChange条件
+    case 2:  // FrameChange条件
       newInfo = {
-        top_diff: top_diff_value,
-        left_diff: left_diff_value,
+        top_diff: default_top_diff,
+        left_diff: default_left_diff,
         width: default_width,
         height: default_width * HeightPerWidthRate,
         border_r: default_border_r,
         border_g: default_border_g,
         border_b: default_border_b,
-        border_a: default_border_a
-      };
+        border_a: border_a_value
+      }
       break;
     case 3:  // SizeChange条件
       newInfo = {
@@ -201,7 +226,19 @@ function setWindowInfo(fc_d_from_fc_vector: number[], rad_head_direction: number
         border_a: default_border_a
       };
       break;
-    case 4:  // PositionAndChange条件
+    case 4:  // PositionChange条件
+      newInfo = {
+        top_diff: top_diff_value,
+        left_diff: left_diff_value,
+        width: default_width,
+        height: default_width * HeightPerWidthRate,
+        border_r: default_border_r,
+        border_g: default_border_g,
+        border_b: default_border_b,
+        border_a: default_border_a
+      };
+      break;
+    case 5:  // PositionAndSizeChange条件
       newInfo = {
         top_diff: top_diff_value,
         left_diff: left_diff_value,
@@ -212,18 +249,6 @@ function setWindowInfo(fc_d_from_fc_vector: number[], rad_head_direction: number
         border_b: default_border_b,
         border_a: default_border_a
       };
-      break;
-    case 5:  // BorderColorChange条件
-      newInfo = {
-        top_diff: default_top_diff,
-        left_diff: default_left_diff,
-        width: default_width,
-        height: default_width * HeightPerWidthRate,
-        border_r: default_border_r,
-        border_g: default_border_g,
-        border_b: default_border_b,
-        border_a: border_a_value
-      }
       break;
     default:  // Baseline条件
       newInfo = {
@@ -243,6 +268,9 @@ function setWindowInfo(fc_d_from_fc_vector: number[], rad_head_direction: number
 }
 
 export const MainContent = () => {
+  // 自分自身の参加者情報
+  const [ me, setMe ] = useState<LocalP2PRoomMember>();
+
   const appId = useMemo(() => process.env.REACT_APP_SKYWAY_APP_ID, []);
   const secretKey = useMemo(() => process.env.REACT_APP_SKYWAY_SECRET_KEY, []);
 
@@ -361,9 +389,12 @@ export const MainContent = () => {
     }
   }, [ myWindowInfo ]);
 
-  // MediaPipeを用いて，対話相手の頭部方向を取得
+  // MediaPipeを用いて，会話相手の頭部方向を取得
   const webcamRef = useRef<Webcam>(null);
   const resultsRef = useRef<Results>();
+  // 会話相手の頭部方向のログデータをCSVファイルとして書き出す
+  const CSV_HeadDirection_Ref = useRef<CSVLink & HTMLAnchorElement & { link: HTMLAnchorElement }>(null);
+  const [headDirectionResults, setHeadDirectionResults] = useState<CSV_HeadDirection_Info[]>([]);
 
   /** 検出結果（フレーム毎に呼び出される） */
   const onResults = useCallback((results: Results) => {
@@ -425,11 +456,11 @@ export const MainContent = () => {
       // 頭部方向（ラジアン）
       let rad_head_direction = Math.acos(Inner(base_vector, fc_d_from_fc_vector) / (Norm(base_vector) * Norm(fc_d_from_fc_vector)));
       // 頭部方向（度）
-      // let theta_head_direction = rad_head_direction * (180 / Math.PI);
+      let theta_head_direction = rad_head_direction * (180 / Math.PI);
       // arccosの値域が0～πであるため，上下の区別をするために，上を向いている時には，ラジアンおよび度の値を更新する
       if (fc_d_from_fc_vector[1] < 0) {
         rad_head_direction = -rad_head_direction;
-        // theta_head_direction = Math.PI * 2 - theta_head_direction;
+        theta_head_direction = Math.PI * 2 - theta_head_direction;
       }
       // eslint-disable-next-line
       // console.log("theta_head_direction = " + theta_head_direction);  // デバッグ用
@@ -441,7 +472,18 @@ export const MainContent = () => {
       // widthの範囲：50~500？
       // 要検討：ウィンドウの動きとユーザの実際の動きを合わせるために，左右反転させる？
       // 自分自身のスクリーンに対するビデオウィンドウの位置の更新（index = 0：自分自身側のスクリーン基準，index = 1：対話相手側のスクリーン基準）
-      setMyWindowInfo(pre => setWindowInfo(fc_d_from_fc_vector, rad_head_direction, screenMyWidth, screenMyHeight, scrollMyX, scrollMyY));
+      setMyWindowInfo(pre => setWindowInfo(conditionID, fc_d_from_fc_vector, rad_head_direction, screenMyWidth, screenMyHeight, scrollMyX, scrollMyY));
+
+      // CSVファイルへの頭部方向の情報のセット
+      // eslint-disable-next-line
+      // console.log(nowTest);  // デバッグ用
+      if (nowTest) {
+        const nowTime = performance.now();
+        setHeadDirectionResults((prev) => [
+          ...prev,
+          { ID: participantID, Condition: conditionID, Time: nowTime - startTime, Theta: theta_head_direction, myWindowWidth: width_tmp_value}
+        ]);
+      }
     }
   },[]);
 
@@ -517,15 +559,10 @@ export const MainContent = () => {
     }
   }, [ otherUserDataStream ]);
 
-  // ルーム名
-  const [ roomName, setRoomName ] = useState("");
-  // 自分自身の参加者情報
-  const [ me, setMe ] = useState<LocalP2PRoomMember>();
-
   // ルームに入ることができるかの確認
   const canJoin = useMemo(() => {
-    return roomName !== "" && localStream != null && me == null;
-  }, [roomName, localStream, me]);
+    return participantID !== -1 && conditionID !== -1 && roomName !== "" && localStream != null && me == null;
+  }, [participantID, conditionID, roomName, localStream, me]);
 
   // Joinボタンをクリックした時に実行する関数
   const onJoinClick = useCallback(async () => {
@@ -600,49 +637,95 @@ export const MainContent = () => {
   }, [roomName, token, localStream, localDataStream]);
 
   const [ otherUserPublications, setOtherUserPublications ] = useState<RoomPublication<LocalStream>[]>([]);
+
+  // CSVファイルに書き出すデータの計測開始・計測終了を制御する関数
+  const testStart = () => {
+    setHeadDirectionResults([
+      { ID: participantID, Condition: conditionID, Time: 0, Theta: 0, myWindowWidth: 0}
+    ]);
+    startTime = performance.now();
+    nowTest = true;
+  }
+
+  const testEnd = () => {
+    nowTest = false;
+    CSV_HeadDirection_Ref?.current?.link.click();
+  }
   
   return (
     <div>
       <div id="active-before-conference">
         <p>
+        Your ID:
+        <select id="ID" onChange={(event) => {
+           participantID = Number(event.target.value);
+        }}>
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+          <option value="5">5</option>
+          <option value="6">6</option>
+          <option value="7">7</option>
+          <option value="8">8</option>
+          <option value="9">9</option>
+          <option value="10">10</option>
+          <option value="11">11</option>
+          <option value="12">12</option>
+          <option value="13">13</option>
+          <option value="14">14</option>
+          <option value="15">15</option>
+          <option value="16">16</option>
+          <option value="17">17</option>
+          <option value="18">18</option>
+          <option value="19">19</option>
+          <option value="20">20</option>
+        </select>
+        &nbsp;&nbsp;
         condition=
         <select id="condition" onChange={(event) => { 
-          condition_ID = Number(event.target.value);
-          switch(condition_ID) {
+          conditionID = Number(event.target.value);
+          switch(conditionID) {
             case 1:
-              condition_name = "Baseline";
+              conditionName = "Baseline";
               break;
             case 2:
-              condition_name = "PositionChange";
+              conditionName = "FrameChange";
               break;
             case 3:
-              condition_name = "SizeChange";
+              conditionName = "SizeChange";
               break;
             case 4:
-              condition_name = "PositionAndSizeChange";
+              conditionName = "PositionChange";
               break;
             case 5:
-              condition_name = "BorderColorChange";
+              conditionName = "PositionAndSizeChange";
               break;
             default:
-              condition_name = "";
+              conditionName = "";
               break;
           }
         }}>
           <option value="1">Baseline</option>
-          {/* <option value="2">PositionChange</option> */}
+          <option value="2">FrameChange</option>
           <option value="3">SizeChange</option>
-          {/* <option value="4">PositionAndSizeChange</option> */}
-          <option value="5">BorderColorChange</option>
-        </select>　
-        {/* ID: {me?.id ?? ""} */}
-        </p>
-        room name: <input type="text" value={roomName} onChange={(e) => setRoomName(e.target.value)} />
+          {/* <option value="4">PositionChange</option> */}          
+          {/* <option value="5">PositionAndSizeChange</option> */}
+        </select>
+        &nbsp;&nbsp;
+        room name: <input type="text" value={roomName} onChange={(e) => { roomName = e.target.value; }} />
+        &nbsp;
         <button onClick={onJoinClick} disabled={!canJoin}>join</button>
+        </p>
       </div>
       <div id="active-after-conference" className="non-active">
-        ID: {me?.id ?? ""}　room name: {roomName}　condition: {condition_name}
+        ID: { participantID } &nbsp;&nbsp; condition: {conditionName} &nbsp;&nbsp; room name: {roomName}
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        <button onClick={testStart} disabled={nowTest}>Task Start</button>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        <button onClick={testEnd} disabled={!nowTest}>Task End</button>
       </div>
+      <CSVLink data={headDirectionResults} filename={`C${conditionID}_ID${participantID}_headDirectionResults.csv`} ref={CSV_HeadDirection_Ref} ></CSVLink>
       {/* <div className="field-area" tabIndex={-1} onKeyDown={ onKeyDown }> */}
         <div className="icon-container">
           <video id="local-video" ref={localVideo} muted playsInline style={myWindowContainerStyle}></video>
