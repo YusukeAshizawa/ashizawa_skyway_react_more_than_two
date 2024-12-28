@@ -27,12 +27,13 @@ interface WindowInfo {
     top_diff: number;  // 位置を移動させる場合の上下方向の変化量
     left_diff: number;  // 位置を移動させる場合の左右方向の変化量
     width: number;
-    width_inCaseOf_change: number;  // ビデオウィンドウの大きさを変更した場合の大きさ
     height: number;  // heightはwidthのHeightPerWidthRate倍
     border_r: number;  // ビデオウィンドウの枠の色（赤）の値
     border_g: number;  // ビデオウィンドウの枠の色（緑）の値
     border_b: number;  // ビデオウィンドウの枠の色（青）の値
     border_a: number;  // ビデオウィンドウの枠の色の透明度の値
+    theta: number;  // 頭部方向（度）
+    width_inCaseOf_change: number;  // ビデオウィンドウの大きさを変更した場合の大きさ
 }
 
 // CSVファイルに書き出す頭部方向の情報
@@ -40,8 +41,9 @@ interface CSV_HeadDirection_Info {
   ID: number;
   Condition: number;
   Time: number;
-  Theta: number;
+  myTheta: number;
   myWindowWidth: number;
+  otherTheta: number;
   otherWindowWidth: number;
 }
 
@@ -120,7 +122,7 @@ const border_a_min_threshold = 0.015;
 let myWindowWidth_tmp_value = 0;
 
 // ビデオウィンドウのInfoの更新
-function setWindowInfo(conditionID: number, fc_d_from_fc_vector: number[], rad_head_direction: number) {
+function setWindowInfo(conditionID: number, fc_d_from_fc_vector: number[], rad_head_direction: number, theta_head_direction: number) {
   // ウィンドウの大きさの最大値に対する，実際のウィンドウの大きさの比率
   let next_width_rate = 0;
   // ビデオウィンドウの枠の色の透明度の比率
@@ -168,7 +170,7 @@ function setWindowInfo(conditionID: number, fc_d_from_fc_vector: number[], rad_h
   // ビデオウィンドウの大きさの一次保存（大きさを変更しない条件でも分析できるようにするため）
   myWindowWidth_tmp_value = width_value;
   // eslint-disable-next-line
-  console.log(myWindowWidth_tmp_value);  // デバッグ用
+  // console.log(myWindowWidth_tmp_value);  // デバッグ用
 
   // BaseLine条件・PositionChange・FrameChange条件の時には，top・leftの値にwidth_valueの値が影響を与えないようにするために，width_valueの値を更新
   if (conditionID === 1 || conditionID === 2 || conditionID === 4) width_value = default_width;
@@ -201,12 +203,13 @@ function setWindowInfo(conditionID: number, fc_d_from_fc_vector: number[], rad_h
         top_diff: default_top_diff,
         left_diff: default_left_diff,
         width: default_width,
-        width_inCaseOf_change: myWindowWidth_tmp_value,
         height: default_width * HeightPerWidthRate,
         border_r: default_border_r,
         border_g: default_border_g,
         border_b: default_border_b,
-        border_a: default_border_a
+        border_a: default_border_a,
+        width_inCaseOf_change: myWindowWidth_tmp_value,
+        theta: theta_head_direction
       };
       break;
     case 2:  // FrameChange条件
@@ -214,12 +217,13 @@ function setWindowInfo(conditionID: number, fc_d_from_fc_vector: number[], rad_h
         top_diff: default_top_diff,
         left_diff: default_left_diff,
         width: default_width,
-        width_inCaseOf_change: myWindowWidth_tmp_value,
         height: default_width * HeightPerWidthRate,
         border_r: default_border_r,
         border_g: default_border_g,
         border_b: default_border_b,
-        border_a: border_a_value
+        border_a: border_a_value,
+        width_inCaseOf_change: myWindowWidth_tmp_value,
+        theta: theta_head_direction
       }
       break;
     case 3:  // SizeChange条件
@@ -227,12 +231,13 @@ function setWindowInfo(conditionID: number, fc_d_from_fc_vector: number[], rad_h
         top_diff: default_top_diff,
         left_diff: default_left_diff,
         width: width_value,
-        width_inCaseOf_change: myWindowWidth_tmp_value,
         height: width_value * HeightPerWidthRate,
         border_r: default_border_r,
         border_g: default_border_g,
         border_b: default_border_b,
-        border_a: default_border_a
+        border_a: default_border_a,
+        width_inCaseOf_change: myWindowWidth_tmp_value,
+        theta: theta_head_direction
       };
       break;
     case 4:  // PositionChange条件
@@ -240,12 +245,13 @@ function setWindowInfo(conditionID: number, fc_d_from_fc_vector: number[], rad_h
         top_diff: top_diff_value,
         left_diff: left_diff_value,
         width: default_width,
-        width_inCaseOf_change: myWindowWidth_tmp_value,
         height: default_width * HeightPerWidthRate,
         border_r: default_border_r,
         border_g: default_border_g,
         border_b: default_border_b,
-        border_a: default_border_a
+        border_a: default_border_a,
+        width_inCaseOf_change: myWindowWidth_tmp_value,
+        theta: theta_head_direction
       };
       break;
     case 5:  // PositionAndSizeChange条件
@@ -253,12 +259,13 @@ function setWindowInfo(conditionID: number, fc_d_from_fc_vector: number[], rad_h
         top_diff: top_diff_value,
         left_diff: left_diff_value,
         width: width_value,
-        width_inCaseOf_change: myWindowWidth_tmp_value,
         height: width_value * HeightPerWidthRate,
         border_r: default_border_r,
         border_g: default_border_g,
         border_b: default_border_b,
-        border_a: default_border_a
+        border_a: default_border_a,
+        width_inCaseOf_change: myWindowWidth_tmp_value,
+        theta: theta_head_direction
       };
       break;
     default:  // Baseline条件
@@ -266,12 +273,13 @@ function setWindowInfo(conditionID: number, fc_d_from_fc_vector: number[], rad_h
         top_diff: default_top_diff,
         left_diff: default_left_diff,
         width: default_width,
-        width_inCaseOf_change: myWindowWidth_tmp_value,
         height: default_width * HeightPerWidthRate,
         border_r: default_border_r,
         border_g: default_border_g,
         border_b: default_border_b,
-        border_a: default_border_a
+        border_a: default_border_a,
+        width_inCaseOf_change: myWindowWidth_tmp_value,
+        theta: theta_head_direction
       };
       break;
   }
@@ -373,8 +381,8 @@ export const MainContent = () => {
 
   // 自分自身のウィンドウの位置・大きさの調整
   const [ myWindowInfo, setMyWindowInfo ] = useState<WindowInfo>({ 
-    top_diff: default_top_diff, left_diff: default_left_diff, width: default_width, width_inCaseOf_change: 0, height: default_width * HeightPerWidthRate,
-    border_r: default_border_r, border_g: default_border_g, border_b: default_border_b, border_a: default_border_a
+    top_diff: default_top_diff, left_diff: default_left_diff, width: default_width, height: default_width * HeightPerWidthRate,
+    border_r: default_border_r, border_g: default_border_g, border_b: default_border_b, border_a: default_border_a, width_inCaseOf_change: 0, theta: 0
   });
 
   // フィールド領域をはみ出ないように調整を入れる
@@ -399,7 +407,7 @@ export const MainContent = () => {
       // eslint-disable-next-line
       // console.log("自分のデータを送信しました！");  // デバッグ用
       // eslint-disable-next-line
-      // console.log(myWindowInfo.width_inCaseOf_change);  // デバッグ用
+      // console.log("送信前のwidth_inCaseOf_changeの値：" + myWindowInfo.width_inCaseOf_change);  // デバッグ用
     }
   }, [ myWindowInfo ]);
 
@@ -486,18 +494,7 @@ export const MainContent = () => {
       // widthの範囲：100~500？
       // 要検討：ウィンドウの動きとユーザの実際の動きを合わせるために，左右反転させる？
       // 自分自身のスクリーンに対するビデオウィンドウの位置の更新（index = 0：自分自身側のスクリーン基準，index = 1：対話相手側のスクリーン基準）
-      setMyWindowInfo(pre => setWindowInfo(conditionID, fc_d_from_fc_vector, rad_head_direction));
-
-      // CSVファイルへの頭部方向の情報のセット
-      // eslint-disable-next-line
-      // console.log(nowTest);  // デバッグ用
-      if (nowTest) {
-        const nowTime = performance.now();
-        setHeadDirectionResults((prev) => [
-          ...prev,
-          { ID: participantID, Condition: conditionID, Time: nowTime - startTime, Theta: theta_head_direction, myWindowWidth: myWindowWidth_tmp_value, otherWindowWidth: otherUserWindowInfo.width_inCaseOf_change }
-        ]);
-      }
+      setMyWindowInfo(pre => setWindowInfo(conditionID, fc_d_from_fc_vector, rad_head_direction, theta_head_direction));
     }
   },[]);
 
@@ -534,8 +531,8 @@ export const MainContent = () => {
   // 他ユーザの座標情報を保持
   // （これを自分のアイコンと同様に画面表示用のstyleに反映する）
   const [ otherUserWindowInfo, setOtherUserWindowInfo ] = useState<WindowInfo>({
-    top_diff: default_top_diff, left_diff: default_left_diff, width: default_width,  width_inCaseOf_change: 0, height: default_width * HeightPerWidthRate,
-    border_r: default_border_r, border_g: default_border_g, border_b: default_border_b, border_a: default_border_a
+    top_diff: default_top_diff, left_diff: default_left_diff, width: default_width, height: default_width * HeightPerWidthRate,
+    border_r: default_border_r, border_g: default_border_g, border_b: default_border_b, border_a: default_border_a, width_inCaseOf_change: 0, theta: 0
    });
 
   // 他ユーザのウィンドウの位置・大きさの変更
@@ -558,6 +555,8 @@ export const MainContent = () => {
     if (otherUserDataStream != null) {
       // callbackで受信座標を反映する
       otherUserDataStream.onData.add((args) => {
+        // eslint-disable-next-line
+        // console.log(args);  // デバッグ用
         setOtherUserWindowInfo(args as WindowInfo);
         // eslint-disable-next-line
         // console.log("bbb");  // デバッグ用
@@ -574,6 +573,21 @@ export const MainContent = () => {
       });
     }
   }, [ otherUserDataStream ]);
+
+  // CSVファイルへの頭部方向の情報のセット
+  useEffect(() => {
+      // eslint-disable-next-line
+      // console.log(nowTest);  // デバッグ用
+      if (otherUserDataStream != null) {
+        if (nowTest) {
+          const nowTime = performance.now();
+          setHeadDirectionResults((prev) => [
+            ...prev,
+            { ID: participantID, Condition: conditionID, Time: nowTime - startTime, myTheta: myWindowInfo.theta, myWindowWidth: myWindowInfo.width_inCaseOf_change, otherTheta: otherUserWindowInfo.theta, otherWindowWidth: otherUserWindowInfo.width_inCaseOf_change }
+          ]);
+        }
+      }
+  }, [ otherUserWindowInfo ]);
 
   // Webgazer.jsを用いた視線取得
   // const [gazeData, setGazeData] = useState<GazeData | null>(null);
@@ -679,7 +693,7 @@ export const MainContent = () => {
   // CSVファイルに書き出すデータの計測開始・計測終了を制御する関数
   const testStart = () => {
     setHeadDirectionResults([
-      { ID: participantID, Condition: conditionID, Time: 0, Theta: 0, myWindowWidth: 0, otherWindowWidth: 0 }
+      { ID: participantID, Condition: conditionID, Time: 0, myTheta: 0, myWindowWidth: 0, otherTheta: 0, otherWindowWidth: 0 }
     ]);
     startTime = performance.now();
     nowTest = true;
