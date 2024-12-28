@@ -6,6 +6,7 @@ import { FaceMesh, Results } from '@mediapipe/face_mesh';
 import { Camera } from "@mediapipe/camera_utils";
 import Webcam from "react-webcam";
 import { CSVLink } from "react-csv";
+// import webgazer, { GazeData } from 'webgazer';
 
 // 参加者ID
 let participantID = 1;
@@ -26,6 +27,7 @@ interface WindowInfo {
     top_diff: number;  // 位置を移動させる場合の上下方向の変化量
     left_diff: number;  // 位置を移動させる場合の左右方向の変化量
     width: number;
+    width_inCaseOf_change: number;  // ビデオウィンドウの大きさを変更した場合の大きさ
     height: number;  // heightはwidthのHeightPerWidthRate倍
     border_r: number;  // ビデオウィンドウの枠の色（赤）の値
     border_g: number;  // ビデオウィンドウの枠の色（緑）の値
@@ -40,6 +42,7 @@ interface CSV_HeadDirection_Info {
   Time: number;
   Theta: number;
   myWindowWidth: number;
+  otherWindowWidth: number;
 }
 
 // 数値型リストの要素の平均値を求める関数
@@ -114,10 +117,10 @@ const border_a_max = 1;
 const border_a_min_threshold = 0.015;
 
 // ビデオウィンドウの大きさの一次保存（大きさを変更しない条件でも分析できるようにするため）
-let width_tmp_value = 0;
+let myWindowWidth_tmp_value = 0;
 
-// ビデオウィンドウのInfoの更新（index = 0：参加者自身のビデオウィンドウ，index = 1：対話相手のビデオウィンドウ）
-function setWindowInfo(conditionID: number, fc_d_from_fc_vector: number[], rad_head_direction: number, screen_Width: number, screen_Height: number, scroll_X: number, scroll_Y: number) {
+// ビデオウィンドウのInfoの更新
+function setWindowInfo(conditionID: number, fc_d_from_fc_vector: number[], rad_head_direction: number) {
   // ウィンドウの大きさの最大値に対する，実際のウィンドウの大きさの比率
   let next_width_rate = 0;
   // ビデオウィンドウの枠の色の透明度の比率
@@ -162,7 +165,10 @@ function setWindowInfo(conditionID: number, fc_d_from_fc_vector: number[], rad_h
   if (border_a_value < border_a_min_threshold) border_a_value = border_a_min;
 
   // CSVファイルへの保存用
-  width_tmp_value = width_value;
+  // ビデオウィンドウの大きさの一次保存（大きさを変更しない条件でも分析できるようにするため）
+  myWindowWidth_tmp_value = width_value;
+  // eslint-disable-next-line
+  console.log(myWindowWidth_tmp_value);  // デバッグ用
 
   // BaseLine条件・PositionChange・FrameChange条件の時には，top・leftの値にwidth_valueの値が影響を与えないようにするために，width_valueの値を更新
   if (conditionID === 1 || conditionID === 2 || conditionID === 4) width_value = default_width;
@@ -195,6 +201,7 @@ function setWindowInfo(conditionID: number, fc_d_from_fc_vector: number[], rad_h
         top_diff: default_top_diff,
         left_diff: default_left_diff,
         width: default_width,
+        width_inCaseOf_change: myWindowWidth_tmp_value,
         height: default_width * HeightPerWidthRate,
         border_r: default_border_r,
         border_g: default_border_g,
@@ -207,6 +214,7 @@ function setWindowInfo(conditionID: number, fc_d_from_fc_vector: number[], rad_h
         top_diff: default_top_diff,
         left_diff: default_left_diff,
         width: default_width,
+        width_inCaseOf_change: myWindowWidth_tmp_value,
         height: default_width * HeightPerWidthRate,
         border_r: default_border_r,
         border_g: default_border_g,
@@ -219,6 +227,7 @@ function setWindowInfo(conditionID: number, fc_d_from_fc_vector: number[], rad_h
         top_diff: default_top_diff,
         left_diff: default_left_diff,
         width: width_value,
+        width_inCaseOf_change: myWindowWidth_tmp_value,
         height: width_value * HeightPerWidthRate,
         border_r: default_border_r,
         border_g: default_border_g,
@@ -231,6 +240,7 @@ function setWindowInfo(conditionID: number, fc_d_from_fc_vector: number[], rad_h
         top_diff: top_diff_value,
         left_diff: left_diff_value,
         width: default_width,
+        width_inCaseOf_change: myWindowWidth_tmp_value,
         height: default_width * HeightPerWidthRate,
         border_r: default_border_r,
         border_g: default_border_g,
@@ -243,6 +253,7 @@ function setWindowInfo(conditionID: number, fc_d_from_fc_vector: number[], rad_h
         top_diff: top_diff_value,
         left_diff: left_diff_value,
         width: width_value,
+        width_inCaseOf_change: myWindowWidth_tmp_value,
         height: width_value * HeightPerWidthRate,
         border_r: default_border_r,
         border_g: default_border_g,
@@ -255,6 +266,7 @@ function setWindowInfo(conditionID: number, fc_d_from_fc_vector: number[], rad_h
         top_diff: default_top_diff,
         left_diff: default_left_diff,
         width: default_width,
+        width_inCaseOf_change: myWindowWidth_tmp_value,
         height: default_width * HeightPerWidthRate,
         border_r: default_border_r,
         border_g: default_border_g,
@@ -361,7 +373,7 @@ export const MainContent = () => {
 
   // 自分自身のウィンドウの位置・大きさの調整
   const [ myWindowInfo, setMyWindowInfo ] = useState<WindowInfo>({ 
-    top_diff: default_top_diff, left_diff: default_left_diff, width: default_width, height: default_width * HeightPerWidthRate, 
+    top_diff: default_top_diff, left_diff: default_left_diff, width: default_width, width_inCaseOf_change: 0, height: default_width * HeightPerWidthRate,
     border_r: default_border_r, border_g: default_border_g, border_b: default_border_b, border_a: default_border_a
   });
 
@@ -386,6 +398,8 @@ export const MainContent = () => {
       localDataStream.write(myWindowInfo);
       // eslint-disable-next-line
       // console.log("自分のデータを送信しました！");  // デバッグ用
+      // eslint-disable-next-line
+      // console.log(myWindowInfo.width_inCaseOf_change);  // デバッグ用
     }
   }, [ myWindowInfo ]);
 
@@ -469,10 +483,10 @@ export const MainContent = () => {
       // eslint-disable-next-line
       // console.log("diff_left = " + distance_rate_move * Norm(fc_d_from_fc_vector) * Math.cos(rad_head_direction));  // デバッグ用
 
-      // widthの範囲：50~500？
+      // widthの範囲：100~500？
       // 要検討：ウィンドウの動きとユーザの実際の動きを合わせるために，左右反転させる？
       // 自分自身のスクリーンに対するビデオウィンドウの位置の更新（index = 0：自分自身側のスクリーン基準，index = 1：対話相手側のスクリーン基準）
-      setMyWindowInfo(pre => setWindowInfo(conditionID, fc_d_from_fc_vector, rad_head_direction, screenMyWidth, screenMyHeight, scrollMyX, scrollMyY));
+      setMyWindowInfo(pre => setWindowInfo(conditionID, fc_d_from_fc_vector, rad_head_direction));
 
       // CSVファイルへの頭部方向の情報のセット
       // eslint-disable-next-line
@@ -481,7 +495,7 @@ export const MainContent = () => {
         const nowTime = performance.now();
         setHeadDirectionResults((prev) => [
           ...prev,
-          { ID: participantID, Condition: conditionID, Time: nowTime - startTime, Theta: theta_head_direction, myWindowWidth: width_tmp_value}
+          { ID: participantID, Condition: conditionID, Time: nowTime - startTime, Theta: theta_head_direction, myWindowWidth: myWindowWidth_tmp_value, otherWindowWidth: otherUserWindowInfo.width_inCaseOf_change }
         ]);
       }
     }
@@ -520,7 +534,7 @@ export const MainContent = () => {
   // 他ユーザの座標情報を保持
   // （これを自分のアイコンと同様に画面表示用のstyleに反映する）
   const [ otherUserWindowInfo, setOtherUserWindowInfo ] = useState<WindowInfo>({
-    top_diff: default_top_diff, left_diff: default_left_diff, width: default_width, height: default_width * HeightPerWidthRate,
+    top_diff: default_top_diff, left_diff: default_left_diff, width: default_width,  width_inCaseOf_change: 0, height: default_width * HeightPerWidthRate,
     border_r: default_border_r, border_g: default_border_g, border_b: default_border_b, border_a: default_border_a
    });
 
@@ -555,9 +569,33 @@ export const MainContent = () => {
         // console.log("対話相手のスクリーンの高さ（送信後） = " + screenOtherHeight);  // デバッグ用
         // eslint-disable-next-line
         // console.log("相手のデータを受信しました！");  // デバッグ用
+        // eslint-disable-next-line
+        // console.log(otherUserWindowInfo.width_inCaseOf_change);  // デバッグ用
       });
     }
   }, [ otherUserDataStream ]);
+
+  // Webgazer.jsを用いた視線取得
+  // const [gazeData, setGazeData] = useState<GazeData | null>(null);
+
+  // useEffect(() => {
+  // WebGazerの初期化
+  //   webgazer
+  //     .setGazeListener((data: GazeData, elapsedTime: number) => {
+  //       if (data) {
+  //         setGazeData({ x: data.x, y: data.y });
+  //       }
+  //     })
+  //     .begin()
+  //     .then(() => {
+  //       console.log('WebGazer has started');
+  //     });
+
+  //   // クリーンアップ関数
+  //   return () => {
+  //     webgazer.stop();
+  //   };
+  // }, []);
 
   // ルームに入ることができるかの確認
   const canJoin = useMemo(() => {
@@ -641,7 +679,7 @@ export const MainContent = () => {
   // CSVファイルに書き出すデータの計測開始・計測終了を制御する関数
   const testStart = () => {
     setHeadDirectionResults([
-      { ID: participantID, Condition: conditionID, Time: 0, Theta: 0, myWindowWidth: 0}
+      { ID: participantID, Condition: conditionID, Time: 0, Theta: 0, myWindowWidth: 0, otherWindowWidth: 0 }
     ]);
     startTime = performance.now();
     nowTest = true;
@@ -721,9 +759,9 @@ export const MainContent = () => {
       <div id="active-after-conference" className="non-active">
         ID: { participantID } &nbsp;&nbsp; condition: {conditionName} &nbsp;&nbsp; room name: {roomName}
         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-        <button onClick={testStart} disabled={nowTest}>Task Start</button>
+        <button onClick={testStart} disabled={nowTest}>Measurement Start</button>
         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-        <button onClick={testEnd} disabled={!nowTest}>Task End</button>
+        <button onClick={testEnd} disabled={!nowTest}>Measurement End</button>
       </div>
       <CSVLink data={headDirectionResults} filename={`C${conditionID}_ID${participantID}_headDirectionResults.csv`} ref={CSV_HeadDirection_Ref} ></CSVLink>
       {/* <div className="field-area" tabIndex={-1} onKeyDown={ onKeyDown }> */}
