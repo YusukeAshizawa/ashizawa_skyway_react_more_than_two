@@ -51,6 +51,16 @@ interface CSV_HeadDirection_Info {
   otherWindowWidth: number;
 }
 
+// CSVファイルに書き出す視線の情報
+interface CSV_Gaze_Info {
+  ID: number;
+  condition: number;
+  startTime: number;
+  endTime: number;
+  myGazeX: number;
+  myGazeY: number;
+}
+
 // CSVファイルに書き出す音声データ・参加者の状態（発話者か否か）の情報
 interface CSV_AudioAndParticipants_Info {
   ID: number;
@@ -463,6 +473,9 @@ export const MainContent = () => {
   // 自分・会話相手の頭部方向のログデータをCSVファイルとして書き出す
   const CSV_HeadDirection_Ref = useRef<CSVLink & HTMLAnchorElement & { link: HTMLAnchorElement }>(null);
   const [headDirectionResults, setHeadDirectionResults] = useState<CSV_HeadDirection_Info[]>([]);
+  // 自分・会話相手の視線のログデータをCSVファイルとして書き出す
+  const CSV_Gaze_Ref = useRef<CSVLink & HTMLAnchorElement & { link: HTMLAnchorElement }>(null);
+  const [gazeResults, setGazeResults] = useState<CSV_Gaze_Info[]>([]);
   // 音声データをCSVファイルとして書き出す
   const CSV_AudioAndParticipants_Ref = useRef<CSVLink & HTMLAnchorElement & { link: HTMLAnchorElement }>(null);
   const [audioAndParticipantsResults, setAudioAndParticipantsResults] = useState<CSV_AudioAndParticipants_Info[]>([]);
@@ -628,6 +641,7 @@ export const MainContent = () => {
 
   // 計測開始時間の定義
   const [startTime_HeadDirection, setStartTime_HeadDirection] = useState<number>(0);
+  const [startTime_Gaze, setStartTime_Gaze] = useState<number>(0);
   const [startTime_AudioAndParticipants, setStartTime_AudioAndParticipants] = useState<number>(0);
   const [startTime_Talk, setStartTime_Talk] = useState<number>(0);
 
@@ -653,53 +667,53 @@ export const MainContent = () => {
       }
   }, [ otherUserWindowAndAudioAndParticipantsInfo ]);
 
-  // Webgazer.jsを用いた視線取得
-  // const [gazeData, setGazeData] = useState<GazeData | null>(null);
-
-  // useEffect(() => {
-  // WebGazerの初期化
-  //   webgazer
-  //     .setGazeListener((data: GazeData, elapsedTime: number) => {
-  //       if (data) {
-  //         setGazeData({ x: data.x, y: data.y });
-  //       }
-  //     })
-  //     .begin()
-  //     .then(() => {
-  //       console.log('WebGazer has started');
-  //     });
-
-  //   // クリーンアップ関数
-  //   return () => {
-  //     webgazer.stop();
-  //   };
-  // }, []);
-
   // 話し手か否かの判定 + listeningがfalseになった時、trueにする
   const [isSpeaker, setIsSpeaker] = useState<boolean>(false);
+
+  // useEffect(() => {
+  //   if (otherUserDataStream != null && webSpeechAudio != null) {
+  //     if (nowTest) {
+  //       // eslint-disable-next-line
+  //       console.log("transcript：" + webSpeechAudio.transcript);  // デバッグ用
+  //       if (webSpeechAudio.transcript) {
+  //         if(!isSpeaker) {
+  //           setIsSpeaker(true);
+  //           setStartTime_Talk((performance.now() - startTime) / 1000);  // 自分の発話開始
+  //         }
+  //       }
+  //       else {
+  //         setIsSpeaker(false);
+  //       }
+
+  //       // eslint-disable-next-line
+  //       // console.log('SpeechRecognition is listening：' + webSpeechAudio.listening);  // デバッグ用
+  //       // if (!webSpeechAudio.listening) {
+  //       //   SpeechRecognition.startListening({
+  //       //     continuous: true,
+  //       //     language: 'ja'
+  //       //   });
+  //       // }
+
+  //       // 発話が完全に終了したタイミングも書き出しておく（発話内容を後々見返せるようにするため）
+  //       if (webSpeechAudio.finalTranscript) {
+  //         const nowTime_Talk = (performance.now() - startTime) / 1000;
+  //         setTalkResults((prev) => [
+  //           ...prev,
+  //           { ID: participantID, Condition: conditionID, startTime: startTime_Talk, endTime: nowTime_Talk, myStatus: isSpeaker, myText: webSpeechAudio.finalTranscript, otherStatus: otherUserWindowAndAudioAndParticipantsInfo.status, otherText: otherUserWindowAndAudioAndParticipantsInfo.text }
+  //         ]);
+  //       }
+  //     }
+  //   }
+  // },[ otherUserWindowAndAudioAndParticipantsInfo, webSpeechAudio]);
+
+  // listeningがfalseになった時、trueにする（飯塚さんのコード参照）
   useEffect(() => {
     if (otherUserDataStream != null && webSpeechAudio != null) {
       if (nowTest) {
-        // eslint-disable-next-line
-        console.log("transcript：" + webSpeechAudio.transcript);  // デバッグ用
-        if (webSpeechAudio.transcript) {
-          if(!isSpeaker) {
-            setIsSpeaker(true);
-            setStartTime_Talk((performance.now() - startTime) / 1000);  // 自分の発話開始
-          }
-        }
-        else {
-          setIsSpeaker(false);
-        }
-
-        // eslint-disable-next-line
-        // console.log('SpeechRecognition is listening：' + webSpeechAudio.listening);  // デバッグ用
-        // if (!webSpeechAudio.listening) {
-        //   SpeechRecognition.startListening({
-        //     continuous: true,
-        //     language: 'ja'
-        //   });
-        // }
+        SpeechRecognition.startListening({
+          continuous: true,
+          language: 'ja'
+        });
 
         // 発話が完全に終了したタイミングも書き出しておく（発話内容を後々見返せるようにするため）
         if (webSpeechAudio.finalTranscript) {
@@ -711,7 +725,28 @@ export const MainContent = () => {
         }
       }
     }
-  },[ otherUserWindowAndAudioAndParticipantsInfo, webSpeechAudio]);
+  },[webSpeechAudio.listening]);
+
+  // transcriptに値がある時、自分自身を話し手として判定する（飯塚さんのコード参照）
+  useEffect(() => {
+    if (otherUserDataStream != null && webSpeechAudio != null) {
+      if (nowTest) {
+        // eslint-disable-next-line
+        console.log("transcript：" + webSpeechAudio.transcript);  // デバッグ用
+        if (webSpeechAudio.transcript) {
+          // eslint-disable-next-line
+          console.log("isSpeaker：" + isSpeaker);  // デバッグ用
+          if(!isSpeaker) {
+            setIsSpeaker(true);
+            setStartTime_Talk((performance.now() - startTime) / 1000);  // 自分の発話開始
+          }
+        }
+        else {
+          setIsSpeaker(false);
+        }
+      }
+    }
+  },[webSpeechAudio.transcript]);
 
   // ルームに入ることができるかの確認
   const canJoin = useMemo(() => {
@@ -800,6 +835,12 @@ export const MainContent = () => {
     ]);
     setStartTime_HeadDirection(0);
 
+    // 視線の書き出し開始
+    setGazeResults([
+      { ID: participantID, condition: conditionID, startTime: 0, endTime: 0, myGazeX: 0, myGazeY: 0 }
+    ]);
+    setStartTime_Gaze(0);
+
     // 音声データ・参加者の状態（発話者か否か）の書き出し開始
     setAudioAndParticipantsResults([
       { ID: participantID, Condition: conditionID, startTime: 0, endTime: 0, myStatus: false, myText: "", otherStatus: false, otherText: "" }
@@ -811,6 +852,23 @@ export const MainContent = () => {
       { ID: participantID, Condition: conditionID, startTime: 0, endTime: 0, myStatus: false, myText: "", otherStatus: false, otherText: "" }
     ]);
     setStartTime_Talk(0);
+
+    // WebGazer.jsを用いた視線取得開始
+    const webgazer = (window as any).webgazer;
+    if (webgazer) {
+      webgazer.setGazeListener((data: any, timestamp: number) => {
+        if (data) {
+          const nowTime_Gaze = (performance.now() - startTime) / 1000;
+          setGazeResults((prev) => [
+            ...prev,
+            { ID: participantID, condition: conditionID, startTime: startTime_Gaze, endTime: nowTime_Gaze, myGazeX: data.x, myGazeY: data.y }
+          ]);
+          setStartTime_Gaze(nowTime_Gaze);
+          // eslint-disable-next-line
+          console.log(`X: ${data.x}, Y: ${data.y}`);  // デバッグ用
+        }
+      });
+    }
 
     if (!webSpeechAudio.browserSupportsSpeechRecognition) {
       // eslint-disable-next-line
@@ -833,15 +891,24 @@ export const MainContent = () => {
 
   // データ計測終了
   const testEnd = () => {
+
+    const webgazer = (window as any).webgazer;
+    if (webgazer) {
+      webgazer.setGazeListener((data: any, timestamp: number) => {});
+    }
+
     nowTest = false;
     SpeechRecognition.stopListening();
     CSV_HeadDirection_Ref?.current?.link.click();
+    CSV_Gaze_Ref?.current?.link.click();
     CSV_AudioAndParticipants_Ref?.current?.link.click();
     CSV_Talk_Ref?.current?.link.click();
 
     // CSVファイルに書き出すデータをコンソールにも出してみる
     // eslint-disable-next-line
     console.log(headDirectionResults);  // デバッグ用
+    // eslint-disable-next-line
+    console.log(gazeResults);  // デバッグ用
     // eslint-disable-next-line
     console.log(audioAndParticipantsResults);  // デバッグ用
     // eslint-disable-next-line
@@ -922,6 +989,7 @@ export const MainContent = () => {
         <button onClick={testEnd} disabled={!nowTest}>Measurement End</button>
       </div>
       <CSVLink data={headDirectionResults} filename={`C${conditionID}_ID${participantID}_headDirectionResults.csv`} ref={CSV_HeadDirection_Ref} ></CSVLink>
+      <CSVLink data={gazeResults} filename={`C${conditionID}_ID${participantID}_gazeResults.csv`} ref={CSV_Gaze_Ref} ></CSVLink>
       <CSVLink data={audioAndParticipantsResults} filename={`C${conditionID}_ID${participantID}_audioAndParticipantsResults.csv`} ref={CSV_AudioAndParticipants_Ref} ></CSVLink>
       <CSVLink data={talkResults} filename={`C${conditionID}_ID${participantID}_talkResults.csv`} ref={CSV_Talk_Ref} ></CSVLink>
       {/* <div className="field-area" tabIndex={-1} onKeyDown={ onKeyDown }> */}

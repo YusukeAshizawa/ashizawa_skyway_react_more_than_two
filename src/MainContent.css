@@ -29,3 +29,11 @@
   max-height: 1000px;  /*ウィンドウの縦幅の最大値*/
   border: 10px solid rgba(255, 255, 255, 0);
 }
+
+#webgazerVideoContainer {
+  display: none !important; /* ビデオフィードを完全に非表示 */
+}
+
+#webgazerGazeDot {
+  /* display: none !important; 赤い点を非表示 */
+}
