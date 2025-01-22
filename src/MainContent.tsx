@@ -863,9 +863,11 @@ export const MainContent = () => {
             ...prev,
             { ID: participantID, condition: conditionID, startTime: startTime_Gaze, endTime: nowTime_Gaze, myGazeX: data.x, myGazeY: data.y }
           ]);
-          setStartTime_Gaze(nowTime_Gaze);
+          setStartTime_Gaze(nowTime_Gaze);  // (何故か更新されない...)
           // eslint-disable-next-line
-          console.log(`X: ${data.x}, Y: ${data.y}`);  // デバッグ用
+          console.log(startTime_Gaze);  // デバッグ用
+          // eslint-disable-next-line
+          // console.log(`X: ${data.x}, Y: ${data.y}`);  // デバッグ用
         }
       });
     }

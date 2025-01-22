@@ -1,8 +1,8 @@
 // import React from 'react';
 // import logo from './logo.svg';
 import './App.css';
-// import { MainContent } from './MainContent';
-import GazeCalibration from './GazeCalibration';
+import { MainContent } from './MainContent';
+// import GazeCalibration from './GazeCalibration';
 
 // サンプルコード
 // function App() {
@@ -28,8 +28,8 @@ import GazeCalibration from './GazeCalibration';
 
 function App() {
   return (
-    <GazeCalibration />
-    // <MainContent />
+    // <GazeCalibration />
+    <MainContent />
   )
 }
 
