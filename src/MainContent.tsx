@@ -35,6 +35,8 @@ interface WindowAndAudioAndParticipantsInfo {
     border_a: number;  // ビデオウィンドウの枠の色の透明度の値
     theta: number;  // 頭部方向（度）
     width_inCaseOf_change: number;  // ビデオウィンドウの大きさを変更した場合の大きさ
+    top_diff_inCaseOf_change: number;  // ビデオウィンドウの位置を変更した場合の上下方向の変化量
+    left_diff_inCaseOf_change: number;  // ビデオウィンドウの位置を変更した場合の左右方向の変化量
     status: boolean;  // 発言者か否か
     text: string;  // 発言内容
 }
@@ -46,8 +48,12 @@ interface CSV_HeadDirection_Info {
   startTime: number;
   endTime: number;
   myTheta: number;
+  myPositionX_diff: number;
+  myPositionY_diff: number;
   myWindowWidth: number;
   otherTheta: number;
+  otherPositionX_diff: number;
+  otherPositionY_diff: number;
   otherWindowWidth: number;
 }
 
@@ -159,6 +165,10 @@ const border_a_min_threshold = 0.015;
 // ビデオウィンドウの大きさの一次保存（大きさを変更しない条件でも分析できるようにするため）
 let myWindowWidth_tmp_value = 0;
 
+// ビデオウィンドウの位置の一次保存（位置を変更しない条件でも分析できるようにするため）
+let myWindowTopDiff_tmp_value = 0;
+let myWindowLeftDiff_tmp_value = 0;
+
 // ビデオウィンドウのInfoの更新+音声データの追加
 function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_vector: number[], rad_head_direction: number, theta_head_direction: number, status: boolean, text: string) {
   // ウィンドウの大きさの最大値に対する，実際のウィンドウの大きさの比率
@@ -247,6 +257,8 @@ function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_
         border_b: default_border_b,
         border_a: default_border_a,
         width_inCaseOf_change: myWindowWidth_tmp_value,
+        top_diff_inCaseOf_change: top_diff_value,
+        left_diff_inCaseOf_change: left_diff_value,
         theta: theta_head_direction,
         status: status,
         text: text
@@ -263,6 +275,8 @@ function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_
         border_b: default_border_b,
         border_a: border_a_value,
         width_inCaseOf_change: myWindowWidth_tmp_value,
+        top_diff_inCaseOf_change: top_diff_value,
+        left_diff_inCaseOf_change: left_diff_value,
         theta: theta_head_direction,
         status: status,
         text: text
@@ -279,6 +293,8 @@ function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_
         border_b: default_border_b,
         border_a: default_border_a,
         width_inCaseOf_change: myWindowWidth_tmp_value,
+        top_diff_inCaseOf_change: top_diff_value,
+        left_diff_inCaseOf_change: left_diff_value,
         theta: theta_head_direction,
         status: status,
         text: text
@@ -295,6 +311,8 @@ function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_
         border_b: default_border_b,
         border_a: default_border_a,
         width_inCaseOf_change: myWindowWidth_tmp_value,
+        top_diff_inCaseOf_change: top_diff_value,
+        left_diff_inCaseOf_change: left_diff_value,
         theta: theta_head_direction,
         status: status,
         text: text
@@ -311,6 +329,8 @@ function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_
         border_b: default_border_b,
         border_a: default_border_a,
         width_inCaseOf_change: myWindowWidth_tmp_value,
+        top_diff_inCaseOf_change: top_diff_value,
+        left_diff_inCaseOf_change: left_diff_value,
         theta: theta_head_direction,
         status: status,
         text: text
@@ -327,6 +347,8 @@ function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_
         border_b: default_border_b,
         border_a: default_border_a,
         width_inCaseOf_change: myWindowWidth_tmp_value,
+        top_diff_inCaseOf_change: top_diff_value,
+        left_diff_inCaseOf_change: left_diff_value,
         theta: theta_head_direction,
         status: status,
         text: text
@@ -432,7 +454,8 @@ export const MainContent = () => {
   // 自分自身のウィンドウの位置・大きさの調整
   const [ myWindowAndAudioAndParticipantsInfo, setMyWindowAndAudioAndParticipantsInfo ] = useState<WindowAndAudioAndParticipantsInfo>({ 
     top_diff: default_top_diff, left_diff: default_left_diff, width: default_width, height: default_width * HeightPerWidthRate,
-    border_r: default_border_r, border_g: default_border_g, border_b: default_border_b, border_a: default_border_a, width_inCaseOf_change: 0, theta: 0, status: false, text: ""
+    border_r: default_border_r, border_g: default_border_g, border_b: default_border_b, border_a: default_border_a, 
+    width_inCaseOf_change: 0, top_diff_inCaseOf_change: 0, left_diff_inCaseOf_change: 0, theta: 0, status: false, text: ""
   });
 
   // フィールド領域をはみ出ないように調整を入れる
@@ -595,7 +618,8 @@ export const MainContent = () => {
   // （これを自分のアイコンと同様に画面表示用のstyleに反映する）
   const [ otherUserWindowAndAudioAndParticipantsInfo, setOtherUserWindowAndAudioAndParticipantsInfo ] = useState<WindowAndAudioAndParticipantsInfo>({
     top_diff: default_top_diff, left_diff: default_left_diff, width: default_width, height: default_width * HeightPerWidthRate,
-    border_r: default_border_r, border_g: default_border_g, border_b: default_border_b, border_a: default_border_a, width_inCaseOf_change: 0, theta: 0, status: false, text: ""
+    border_r: default_border_r, border_g: default_border_g, border_b: default_border_b, border_a: default_border_a, 
+    top_diff_inCaseOf_change: 0, left_diff_inCaseOf_change: 0, width_inCaseOf_change: 0, theta: 0, status: false, text: ""
    });
 
   // 他ユーザのウィンドウの位置・大きさの変更
@@ -652,7 +676,9 @@ export const MainContent = () => {
           const nowTime_HeadDirection = (performance.now() - startTime) / 1000;
           setHeadDirectionResults((prev) => [
             ...prev,
-            { ID: participantID, condition: conditionID, startTime: startTime_HeadDirection, endTime: nowTime_HeadDirection, myTheta: myWindowAndAudioAndParticipantsInfo.theta, myWindowWidth: myWindowAndAudioAndParticipantsInfo.width_inCaseOf_change, otherTheta: otherUserWindowAndAudioAndParticipantsInfo.theta, otherWindowWidth: otherUserWindowAndAudioAndParticipantsInfo.width_inCaseOf_change }
+            { ID: participantID, condition: conditionID, startTime: startTime_HeadDirection, endTime: nowTime_HeadDirection, myTheta: myWindowAndAudioAndParticipantsInfo.theta, 
+              myPositionX_diff: myWindowAndAudioAndParticipantsInfo.left_diff_inCaseOf_change, myPositionY_diff: myWindowAndAudioAndParticipantsInfo.top_diff_inCaseOf_change, myWindowWidth: myWindowAndAudioAndParticipantsInfo.width_inCaseOf_change, 
+              otherPositionX_diff: otherUserWindowAndAudioAndParticipantsInfo.left_diff_inCaseOf_change, otherPositionY_diff: otherUserWindowAndAudioAndParticipantsInfo.top_diff_inCaseOf_change, otherTheta: otherUserWindowAndAudioAndParticipantsInfo.theta, otherWindowWidth: otherUserWindowAndAudioAndParticipantsInfo.width_inCaseOf_change }
           ]);
           setStartTime_HeadDirection(nowTime_HeadDirection);
           const nowTime_AudioAndParticipants = (performance.now() - startTime) / 1000;
@@ -829,7 +855,7 @@ export const MainContent = () => {
   const testStart = () => {
     // 頭部方向の書き出し開始
     setHeadDirectionResults([
-      { ID: participantID, condition: conditionID, startTime: 0, endTime:0, myTheta: 0, myWindowWidth: 0, otherTheta: 0, otherWindowWidth: 0 }
+      { ID: participantID, condition: conditionID, startTime: 0, endTime:0, myTheta: 0, myPositionX_diff: 0, myPositionY_diff: 0, myWindowWidth: 0, otherTheta: 0, otherPositionX_diff: 0, otherPositionY_diff: 0, otherWindowWidth: 0 }
     ]);
     setStartTime_HeadDirection(0);
 
