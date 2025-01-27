@@ -707,46 +707,46 @@ export const MainContent = () => {
   // },[ otherUserWindowAndAudioAndParticipantsInfo, webSpeechAudio]);
 
   // listeningがfalseになった時、trueにする（飯塚さんのコード参照）
-  useEffect(() => {
-    if (otherUserDataStream != null && webSpeechAudio != null) {
-      if (nowTest) {
-        SpeechRecognition.startListening({
-          continuous: true,
-          language: 'ja'
-        });
+  // useEffect(() => {
+  //   if (otherUserDataStream != null && webSpeechAudio != null) {
+  //     if (nowTest) {
+  //       SpeechRecognition.startListening({
+  //         continuous: true,
+  //         language: 'ja'
+  //       });
 
-        // 発話が完全に終了したタイミングも書き出しておく（発話内容を後々見返せるようにするため）
-        if (webSpeechAudio.finalTranscript) {
-          const nowTime_Talk = (performance.now() - startTime) / 1000;
-          setTalkResults((prev) => [
-            ...prev,
-            { ID: participantID, Condition: conditionID, startTime: startTime_Talk, endTime: nowTime_Talk, myStatus: isSpeaker, myText: webSpeechAudio.finalTranscript, otherStatus: otherUserWindowAndAudioAndParticipantsInfo.status, otherText: otherUserWindowAndAudioAndParticipantsInfo.text }
-          ]);
-        }
-      }
-    }
-  },[webSpeechAudio.listening]);
+  //       // 発話が完全に終了したタイミングも書き出しておく（発話内容を後々見返せるようにするため）
+  //       if (webSpeechAudio.finalTranscript) {
+  //         const nowTime_Talk = (performance.now() - startTime) / 1000;
+  //         setTalkResults((prev) => [
+  //           ...prev,
+  //           { ID: participantID, Condition: conditionID, startTime: startTime_Talk, endTime: nowTime_Talk, myStatus: isSpeaker, myText: webSpeechAudio.finalTranscript, otherStatus: otherUserWindowAndAudioAndParticipantsInfo.status, otherText: otherUserWindowAndAudioAndParticipantsInfo.text }
+  //         ]);
+  //       }
+  //     }
+  //   }
+  // },[webSpeechAudio.listening]);
 
-  // transcriptに値がある時、自分自身を話し手として判定する（飯塚さんのコード参照）
-  useEffect(() => {
-    if (otherUserDataStream != null && webSpeechAudio != null) {
-      if (nowTest) {
-        // eslint-disable-next-line
-        console.log("transcript：" + webSpeechAudio.transcript);  // デバッグ用
-        if (webSpeechAudio.transcript) {
-          // eslint-disable-next-line
-          console.log("isSpeaker：" + isSpeaker);  // デバッグ用
-          if(!isSpeaker) {
-            setIsSpeaker(true);
-            setStartTime_Talk((performance.now() - startTime) / 1000);  // 自分の発話開始
-          }
-        }
-        else {
-          setIsSpeaker(false);
-        }
-      }
-    }
-  },[webSpeechAudio.transcript]);
+  // // transcriptに値がある時、自分自身を話し手として判定する（飯塚さんのコード参照）
+  // useEffect(() => {
+  //   if (otherUserDataStream != null && webSpeechAudio != null) {
+  //     if (nowTest) {
+  //       // eslint-disable-next-line
+  //       console.log("transcript：" + webSpeechAudio.transcript);  // デバッグ用
+  //       if (webSpeechAudio.transcript) {
+  //         // eslint-disable-next-line
+  //         console.log("isSpeaker：" + isSpeaker);  // デバッグ用
+  //         if(!isSpeaker) {
+  //           setIsSpeaker(true);
+  //           setStartTime_Talk((performance.now() - startTime) / 1000);  // 自分の発話開始
+  //         }
+  //       }
+  //       else {
+  //         setIsSpeaker(false);
+  //       }
+  //     }
+  //   }
+  // },[webSpeechAudio.transcript]);
 
   // ルームに入ることができるかの確認
   const canJoin = useMemo(() => {
@@ -854,38 +854,38 @@ export const MainContent = () => {
     setStartTime_Talk(0);
 
     // WebGazer.jsを用いた視線取得開始
-    const webgazer = (window as any).webgazer;
-    if (webgazer) {
-      webgazer.setGazeListener((data: any, timestamp: number) => {
-        if (data) {
-          const nowTime_Gaze = (performance.now() - startTime) / 1000;
-          setGazeResults((prev) => [
-            ...prev,
-            { ID: participantID, condition: conditionID, startTime: startTime_Gaze, endTime: nowTime_Gaze, myGazeX: data.x, myGazeY: data.y }
-          ]);
-          setStartTime_Gaze(nowTime_Gaze);  // (何故か更新されない...)
-          // eslint-disable-next-line
-          console.log(startTime_Gaze);  // デバッグ用
-          // eslint-disable-next-line
-          // console.log(`X: ${data.x}, Y: ${data.y}`);  // デバッグ用
-        }
-      });
-    }
+    // const webgazer = (window as any).webgazer;
+    // if (webgazer) {
+    //   webgazer.setGazeListener((data: any, timestamp: number) => {
+    //     if (data) {
+    //       const nowTime_Gaze = (performance.now() - startTime) / 1000;
+    //       setGazeResults((prev) => [
+    //         ...prev,
+    //         { ID: participantID, condition: conditionID, startTime: startTime_Gaze, endTime: nowTime_Gaze, myGazeX: data.x, myGazeY: data.y }
+    //       ]);
+    //       setStartTime_Gaze(nowTime_Gaze);  // (何故か更新されない...)
+    //       // eslint-disable-next-line
+    //       console.log(startTime_Gaze);  // デバッグ用
+    //       // eslint-disable-next-line
+    //       // console.log(`X: ${data.x}, Y: ${data.y}`);  // デバッグ用
+    //     }
+    //   });
+    // }
 
-    if (!webSpeechAudio.browserSupportsSpeechRecognition) {
-      // eslint-disable-next-line
-      console.error("ブラウザが音声認識をサポートしていません。");  // デバッグ用
-    }
+    // if (!webSpeechAudio.browserSupportsSpeechRecognition) {
+    //   // eslint-disable-next-line
+    //   console.error("ブラウザが音声認識をサポートしていません。");  // デバッグ用
+    // }
 
-    // SpeechRecognition.abortListening();  // 一旦音声リセット
+    // // SpeechRecognition.abortListening();  // 一旦音声リセット
 
-    // 音声認識の開始
-    // eslint-disable-next-line
-    // console.log(SpeechRecognition);  // デバッグ用
-    SpeechRecognition.startListening({ 
-      continuous: true, 
-      language: 'ja'
-    });
+    // // 音声認識の開始
+    // // eslint-disable-next-line
+    // // console.log(SpeechRecognition);  // デバッグ用
+    // SpeechRecognition.startListening({ 
+    //   continuous: true, 
+    //   language: 'ja'
+    // });
 
     startTime = performance.now();
     nowTest = true;
