@@ -213,9 +213,9 @@ function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_
   // BaseLine条件・PositionChange・FrameChange条件の時には，top・leftの値にwidth_valueの値が影響を与えないようにするために，width_valueの値を更新
   if (conditionID === 1 || conditionID === 2 || conditionID === 4) width_value = default_width;
 
-  // 2. ウィンドウの位置の算出
-  let top_diff_value = distance_rate_move * Norm(fc_d_from_fc_vector) * Math.sin(rad_head_direction) - width_value/2;
-  let left_diff_value = distance_rate_move * Norm(fc_d_from_fc_vector) * Math.cos(rad_head_direction - Math.PI) - width_value/2;
+  // 2. ビデオウィンドウのスクリーン中心からのずれの算出
+  let top_diff_value = distance_rate_move * Norm(fc_d_from_fc_vector) * Math.sin(rad_head_direction);
+  let left_diff_value = distance_rate_move * Norm(fc_d_from_fc_vector) * Math.cos(rad_head_direction - Math.PI);
 
   // 移動平均を導入するために，値を保存（ビデオウィンドウのスクリーン中心からのずれ）
   move_top_diffs.push(top_diff_value);
@@ -603,10 +603,10 @@ export const MainContent = () => {
   const otherUserWindowAndAudioContainerStyle = useMemo<React.CSSProperties>(() => ({
     position: "absolute",
     top: scrollMyY + screenMyHeight / 2 - otherUserWindowAndAudioAndParticipantsInfo.height / 2 + otherUserWindowAndAudioAndParticipantsInfo.top_diff < 0 ? 0 :
-         scrollMyY + screenMyHeight / 2 - otherUserWindowAndAudioAndParticipantsInfo.height / 2 + otherUserWindowAndAudioAndParticipantsInfo.top_diff > screenMyHeight - otherUserWindowAndAudioAndParticipantsInfo.height / 2 ? screenMyHeight - otherUserWindowAndAudioAndParticipantsInfo.height / 2 : 
+         scrollMyY + screenMyHeight / 2 - otherUserWindowAndAudioAndParticipantsInfo.height / 2 + otherUserWindowAndAudioAndParticipantsInfo.top_diff > screenMyHeight - otherUserWindowAndAudioAndParticipantsInfo.height ? screenMyHeight - otherUserWindowAndAudioAndParticipantsInfo.height : 
          scrollMyY + screenMyHeight / 2 - otherUserWindowAndAudioAndParticipantsInfo.height / 2 + otherUserWindowAndAudioAndParticipantsInfo.top_diff,
     left: scrollMyX + screenMyWidth / 2 - otherUserWindowAndAudioAndParticipantsInfo.width / 2 + otherUserWindowAndAudioAndParticipantsInfo.left_diff < 0 ? 0 :
-          scrollMyX + screenMyWidth / 2 - otherUserWindowAndAudioAndParticipantsInfo.width / 2 + otherUserWindowAndAudioAndParticipantsInfo.left_diff > screenMyWidth - otherUserWindowAndAudioAndParticipantsInfo.width / 2 ? screenMyWidth - otherUserWindowAndAudioAndParticipantsInfo.width : 
+          scrollMyX + screenMyWidth / 2 - otherUserWindowAndAudioAndParticipantsInfo.width / 2 + otherUserWindowAndAudioAndParticipantsInfo.left_diff > screenMyWidth - otherUserWindowAndAudioAndParticipantsInfo.width ? screenMyWidth - otherUserWindowAndAudioAndParticipantsInfo.width : 
           scrollMyX + screenMyWidth / 2 - otherUserWindowAndAudioAndParticipantsInfo.width / 2 + otherUserWindowAndAudioAndParticipantsInfo.left_diff,
     width: otherUserWindowAndAudioAndParticipantsInfo.width,
     border: `10px solid rgba(${otherUserWindowAndAudioAndParticipantsInfo.border_r}, ${otherUserWindowAndAudioAndParticipantsInfo.border_g}, ${otherUserWindowAndAudioAndParticipantsInfo.border_b}, ${otherUserWindowAndAudioAndParticipantsInfo.border_a})`
