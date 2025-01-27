@@ -50,10 +50,12 @@ interface CSV_HeadDirection_Info {
   myTheta: number;
   myPositionX_diff: number;
   myPositionY_diff: number;
+  myDirection: string;
   myWindowWidth: number;
   otherTheta: number;
   otherPositionX_diff: number;
   otherPositionY_diff: number;
+  otherDirection: string;
   otherWindowWidth: number;
 }
 
@@ -120,6 +122,23 @@ function Norm(number_list: number[]) {
   return Math.sqrt(number_list[0] * number_list[0] + number_list[1] * number_list[1]);
 }
 
+// 参加者の視線方向を識別する関数
+function getParticipantDirection(theta: number) {
+  if (theta < 0 || theta > 360) return "Error";
+
+  // 参加者の視線方向を識別（ここで，相手の向いている向きを自分自身側のディスプレイに反映させるために，LeftとRightが逆になっている（242行目の以下の行）ので，注意）
+  // 「let left_diff_value = distance_rate_move * Norm(fc_d_from_fc_vector) * Math.cos(rad_head_direction - Math.PI);」
+  if (theta < 22.5 || theta >= 337.5) return "Left";
+  else if (theta >= 22.5 && theta < 67.5) return "LeftDown";
+  else if (theta >= 67.5 && theta < 112.5) return "Down";
+  else if (theta >= 112.5 && theta < 157.5) return "RightDown";
+  else if (theta >= 157.5 && theta < 202.5) return "Right";
+  else if (theta >= 202.5 && theta < 247.5) return "RightUp";
+  else if (theta >= 247.5 && theta < 292.5) return "Up";
+  else if (theta >= 292.5 && theta < 337.5) return "LeftUp";
+  else return "Error";
+}
+
 // 移動平均計算時のフレーム数
 const MovingAverage_frame = 20;
 // 移動平均計算用の配列
@@ -164,10 +183,6 @@ const border_a_min_threshold = 0.015;
 
 // ビデオウィンドウの大きさの一次保存（大きさを変更しない条件でも分析できるようにするため）
 let myWindowWidth_tmp_value = 0;
-
-// ビデオウィンドウの位置の一次保存（位置を変更しない条件でも分析できるようにするため）
-let myWindowTopDiff_tmp_value = 0;
-let myWindowLeftDiff_tmp_value = 0;
 
 // ビデオウィンドウのInfoの更新+音声データの追加
 function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_vector: number[], rad_head_direction: number, theta_head_direction: number, status: boolean, text: string) {
@@ -568,7 +583,7 @@ export const MainContent = () => {
       // arccosの値域が0～πであるため，上下の区別をするために，上を向いている時には，ラジアンおよび度の値を更新する
       if (fc_d_from_fc_vector[1] < 0) {
         rad_head_direction = -rad_head_direction;
-        theta_head_direction = Math.PI * 2 - theta_head_direction;
+        theta_head_direction = 360 - theta_head_direction;
       }
       // eslint-disable-next-line
       // console.log("theta_head_direction = " + theta_head_direction);  // デバッグ用
@@ -677,8 +692,8 @@ export const MainContent = () => {
           setHeadDirectionResults((prev) => [
             ...prev,
             { ID: participantID, condition: conditionID, startTime: startTime_HeadDirection, endTime: nowTime_HeadDirection, myTheta: myWindowAndAudioAndParticipantsInfo.theta, 
-              myPositionX_diff: myWindowAndAudioAndParticipantsInfo.left_diff_inCaseOf_change, myPositionY_diff: myWindowAndAudioAndParticipantsInfo.top_diff_inCaseOf_change, myWindowWidth: myWindowAndAudioAndParticipantsInfo.width_inCaseOf_change, 
-              otherPositionX_diff: otherUserWindowAndAudioAndParticipantsInfo.left_diff_inCaseOf_change, otherPositionY_diff: otherUserWindowAndAudioAndParticipantsInfo.top_diff_inCaseOf_change, otherTheta: otherUserWindowAndAudioAndParticipantsInfo.theta, otherWindowWidth: otherUserWindowAndAudioAndParticipantsInfo.width_inCaseOf_change }
+              myPositionX_diff: myWindowAndAudioAndParticipantsInfo.left_diff_inCaseOf_change, myPositionY_diff: myWindowAndAudioAndParticipantsInfo.top_diff_inCaseOf_change, myDirection: getParticipantDirection(myWindowAndAudioAndParticipantsInfo.theta), myWindowWidth: myWindowAndAudioAndParticipantsInfo.width_inCaseOf_change, 
+              otherPositionX_diff: otherUserWindowAndAudioAndParticipantsInfo.left_diff_inCaseOf_change, otherPositionY_diff: otherUserWindowAndAudioAndParticipantsInfo.top_diff_inCaseOf_change, otherTheta: otherUserWindowAndAudioAndParticipantsInfo.theta, otherDirection: getParticipantDirection(otherUserWindowAndAudioAndParticipantsInfo.theta), otherWindowWidth: otherUserWindowAndAudioAndParticipantsInfo.width_inCaseOf_change }
           ]);
           setStartTime_HeadDirection(nowTime_HeadDirection);
           const nowTime_AudioAndParticipants = (performance.now() - startTime) / 1000;
@@ -855,7 +870,9 @@ export const MainContent = () => {
   const testStart = () => {
     // 頭部方向の書き出し開始
     setHeadDirectionResults([
-      { ID: participantID, condition: conditionID, startTime: 0, endTime:0, myTheta: 0, myPositionX_diff: 0, myPositionY_diff: 0, myWindowWidth: 0, otherTheta: 0, otherPositionX_diff: 0, otherPositionY_diff: 0, otherWindowWidth: 0 }
+      { ID: participantID, condition: conditionID, startTime: 0, endTime:0, 
+        myTheta: 0, myPositionX_diff: 0, myPositionY_diff: 0, myDirection: "", myWindowWidth: 0, 
+        otherTheta: 0, otherPositionX_diff: 0, otherPositionY_diff: 0, otherDirection: "", otherWindowWidth: 0 }
     ]);
     setStartTime_HeadDirection(0);
 
