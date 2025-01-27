@@ -148,8 +148,10 @@ let move_width: number[] = [];
 let move_border_a: number[] = [];
 
 // スクリーンの幅・高さ（参加者側）
-let screenMyWidth = window.innerWidth;
-let screenMyHeight = window.innerHeight;
+// let screenMyWidth = window.innerWidth;
+// let screenMyHeight = window.innerHeight;
+let screenMyWidth = window.screen.width;
+let screenMyHeight = window.screen.height;
 // ブラウザウィンドウの左上の位置を取得（参加者側）
 let scrollMyX = window.scrollX;
 let scrollMyY = window.scrollY;
@@ -477,10 +479,10 @@ export const MainContent = () => {
   const myWindowAndAudioContainerStyle = useMemo<React.CSSProperties>(() => ({
       position: "absolute",
       top: scrollMyY + screenMyHeight / 2 - myWindowAndAudioAndParticipantsInfo.height / 2 + myWindowAndAudioAndParticipantsInfo.top_diff < 0 ? 0 :
-           scrollMyY + screenMyHeight / 2 - myWindowAndAudioAndParticipantsInfo.height / 2 + myWindowAndAudioAndParticipantsInfo.top_diff > screenMyHeight - myWindowAndAudioAndParticipantsInfo.height / 2 ? screenMyHeight - myWindowAndAudioAndParticipantsInfo.height / 2 : 
+           scrollMyY + screenMyHeight / 2 - myWindowAndAudioAndParticipantsInfo.height / 2 + myWindowAndAudioAndParticipantsInfo.top_diff > screenMyHeight - myWindowAndAudioAndParticipantsInfo.height ? screenMyHeight - myWindowAndAudioAndParticipantsInfo.height : 
            scrollMyY + screenMyHeight / 2 - myWindowAndAudioAndParticipantsInfo.height / 2 + myWindowAndAudioAndParticipantsInfo.top_diff,
       left: scrollMyX + screenMyWidth / 2 - myWindowAndAudioAndParticipantsInfo.width / 2 + myWindowAndAudioAndParticipantsInfo.left_diff < 0 ? 0 :
-            scrollMyX + screenMyWidth / 2 - myWindowAndAudioAndParticipantsInfo.width / 2 + myWindowAndAudioAndParticipantsInfo.left_diff > screenMyWidth - myWindowAndAudioAndParticipantsInfo.width / 2 ? screenMyWidth - myWindowAndAudioAndParticipantsInfo.width : 
+            scrollMyX + screenMyWidth / 2 - myWindowAndAudioAndParticipantsInfo.width / 2 + myWindowAndAudioAndParticipantsInfo.left_diff > screenMyWidth - myWindowAndAudioAndParticipantsInfo.width ? screenMyWidth - myWindowAndAudioAndParticipantsInfo.width : 
             scrollMyX + screenMyWidth / 2 - myWindowAndAudioAndParticipantsInfo.width / 2 + myWindowAndAudioAndParticipantsInfo.left_diff,
       width: myWindowAndAudioAndParticipantsInfo.width,
       border: `10px solid rgba(${myWindowAndAudioAndParticipantsInfo.border_r}, ${myWindowAndAudioAndParticipantsInfo.border_g}, ${myWindowAndAudioAndParticipantsInfo.border_b}, ${myWindowAndAudioAndParticipantsInfo.border_a})`
@@ -501,7 +503,7 @@ export const MainContent = () => {
 
   
   // 音声の初期設定
-  const webSpeechAudio = useSpeechRecognition();
+  // const webSpeechAudio = useSpeechRecognition();
 
   // MediaPipeを用いて，会話相手の頭部方向を取得
   const webcamRef = useRef<Webcam>(null);
@@ -595,7 +597,8 @@ export const MainContent = () => {
       // widthの範囲：100~500？
       // 要検討：ウィンドウの動きとユーザの実際の動きを合わせるために，左右反転させる？
       // 自分自身のスクリーンに対するビデオウィンドウの位置の更新（index = 0：自分自身側のスクリーン基準，index = 1：対話相手側のスクリーン基準）
-      setMyWindowAndAudioAndParticipantsInfo(pre => setWindowAndAudioAndParticipantsInfo(conditionID, fc_d_from_fc_vector, rad_head_direction, theta_head_direction, isSpeaker, webSpeechAudio != null ? webSpeechAudio.transcript : ""));
+      setMyWindowAndAudioAndParticipantsInfo(pre => setWindowAndAudioAndParticipantsInfo(conditionID, fc_d_from_fc_vector, rad_head_direction, theta_head_direction, false, ""));
+      // setMyWindowAndAudioAndParticipantsInfo(pre => setWindowAndAudioAndParticipantsInfo(conditionID, fc_d_from_fc_vector, rad_head_direction, theta_head_direction, isSpeaker, webSpeechAudio != null ? webSpeechAudio.transcript : ""));
     }
   },[]);
 
@@ -688,6 +691,10 @@ export const MainContent = () => {
       // console.log(nowTest);  // デバッグ用
       if (otherUserDataStream != null) {
         if (nowTest) {
+          // eslint-disable-next-line
+          // console.log("スクリーンの幅：" + screenMyWidth + "，スクリーンの高さ：" + screenMyHeight);  // デバッグ用
+          // eslint-disable-next-line
+          // console.log("スクロール量：" + "X = " + scrollMyX + "，Y = " + scrollMyY);  // デバッグ用
           const nowTime_HeadDirection = (performance.now() - startTime) / 1000;
           setHeadDirectionResults((prev) => [
             ...prev,
@@ -707,7 +714,7 @@ export const MainContent = () => {
   }, [ otherUserWindowAndAudioAndParticipantsInfo ]);
 
   // 話し手か否かの判定 + listeningがfalseになった時、trueにする
-  const [isSpeaker, setIsSpeaker] = useState<boolean>(false);
+  // const [isSpeaker, setIsSpeaker] = useState<boolean>(false);
 
   // useEffect(() => {
   //   if (otherUserDataStream != null && webSpeechAudio != null) {
