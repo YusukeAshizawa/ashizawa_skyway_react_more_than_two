@@ -159,8 +159,6 @@ const border_a_min_threshold = 0.015;
 // ビデオウィンドウの大きさの一次保存（大きさを変更しない条件でも分析できるようにするため）
 let myWindowWidth_tmp_value = 0;
 
-// Web Speech APIを用いた音声認識
-
 // ビデオウィンドウのInfoの更新+音声データの追加
 function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_vector: number[], rad_head_direction: number, theta_head_direction: number, status: boolean, text: string) {
   // ウィンドウの大きさの最大値に対する，実際のウィンドウの大きさの比率
