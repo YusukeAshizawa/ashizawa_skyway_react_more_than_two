@@ -475,6 +475,8 @@ export const MainContent = () => {
     width_inCaseOf_change: 0, top_diff_inCaseOf_change: 0, left_diff_inCaseOf_change: 0, theta: 0, status: false, text: ""
   });
 
+  const Text_height = 25;  // テキスト部分の高さ
+
   // フィールド領域をはみ出ないように調整を入れる
   const myWindowAndAudioContainerStyle = useMemo<React.CSSProperties>(() => ({
       position: "absolute",
@@ -641,18 +643,42 @@ export const MainContent = () => {
    });
 
   // 他ユーザのウィンドウの位置・大きさの変更
-  // フィールド領域をはみ出ないように調整を入れる
+  // フィールド領域をはみ出ないように調整を入れる（これ，要る？）
   const otherUserWindowAndAudioContainerStyle = useMemo<React.CSSProperties>(() => ({
     position: "absolute",
-    top: scrollMyY + screenMyHeight / 2 - otherUserWindowAndAudioAndParticipantsInfo.height / 2 + otherUserWindowAndAudioAndParticipantsInfo.top_diff < 0 ? 0 :
-         scrollMyY + screenMyHeight / 2 - otherUserWindowAndAudioAndParticipantsInfo.height / 2 + otherUserWindowAndAudioAndParticipantsInfo.top_diff > screenMyHeight - otherUserWindowAndAudioAndParticipantsInfo.height ? screenMyHeight - otherUserWindowAndAudioAndParticipantsInfo.height : 
-         scrollMyY + screenMyHeight / 2 - otherUserWindowAndAudioAndParticipantsInfo.height / 2 + otherUserWindowAndAudioAndParticipantsInfo.top_diff,
-    left: scrollMyX + screenMyWidth / 2 - otherUserWindowAndAudioAndParticipantsInfo.width / 2 + otherUserWindowAndAudioAndParticipantsInfo.left_diff < 0 ? 0 :
-          scrollMyX + screenMyWidth / 2 - otherUserWindowAndAudioAndParticipantsInfo.width / 2 + otherUserWindowAndAudioAndParticipantsInfo.left_diff > screenMyWidth - otherUserWindowAndAudioAndParticipantsInfo.width ? screenMyWidth - otherUserWindowAndAudioAndParticipantsInfo.width : 
-          scrollMyX + screenMyWidth / 2 - otherUserWindowAndAudioAndParticipantsInfo.width / 2 + otherUserWindowAndAudioAndParticipantsInfo.left_diff,
+    top: window.screenTop + scrollMyY - Text_height - (window.outerHeight - window.innerHeight)  // デフォルト（初期位置）
+         + window.screen.height / 2  // スクリーンの高さの半分
+         - otherUserWindowAndAudioAndParticipantsInfo.height / 2 + otherUserWindowAndAudioAndParticipantsInfo.top_diff // ビデオウィンドウが中央に来るように調整
+         < 0 ? 0 :  // 画面上下にはみ出ないように調整
+         window.screenTop + scrollMyY - Text_height - (window.outerHeight - window.innerHeight) + window.screen.height / 2 - otherUserWindowAndAudioAndParticipantsInfo.height / 2 + otherUserWindowAndAudioAndParticipantsInfo.top_diff 
+         > window.screenTop + scrollMyY - Text_height - (window.outerHeight - window.innerHeight) + window.screen.height - otherUserWindowAndAudioAndParticipantsInfo.height ? window.screenTop + scrollMyY - Text_height - (window.outerHeight - window.innerHeight) + window.screen.height - otherUserWindowAndAudioAndParticipantsInfo.height : 
+         window.screenTop + scrollMyY - Text_height - (window.outerHeight - window.innerHeight) // デフォルト（初期位置）
+         + window.screen.height / 2  // スクリーンの高さの半分
+         - otherUserWindowAndAudioAndParticipantsInfo.height / 2 + otherUserWindowAndAudioAndParticipantsInfo.top_diff, // ビデオウィンドウが中央に来るように調整
+    left: window.screenLeft + scrollMyX  // デフォルト（初期位置）
+          + window.screen.width / 2 // ウィンドウの幅の半分
+          - otherUserWindowAndAudioAndParticipantsInfo.width / 2 + otherUserWindowAndAudioAndParticipantsInfo.left_diff // ビデオウィンドウが中央に来るように調整
+          < 0 ? 0 :  // 画面左右にはみ出ないように調整
+          window.screenLeft + scrollMyX + window.screen.width / 2 - otherUserWindowAndAudioAndParticipantsInfo.width / 2 + otherUserWindowAndAudioAndParticipantsInfo.left_diff 
+          > window.screenLeft + scrollMyX + window.screen.width - otherUserWindowAndAudioAndParticipantsInfo.width ? window.screenLeft + scrollMyX + window.screen.width - otherUserWindowAndAudioAndParticipantsInfo.width : 
+          window.screenLeft + scrollMyX  // デフォルト（初期位置）
+          + window.screen.width / 2 // ウィンドウの幅の半分
+          - otherUserWindowAndAudioAndParticipantsInfo.width / 2 + otherUserWindowAndAudioAndParticipantsInfo.left_diff, // ビデオウィンドウが中央に来るように調整
     width: otherUserWindowAndAudioAndParticipantsInfo.width,
     border: `10px solid rgba(${otherUserWindowAndAudioAndParticipantsInfo.border_r}, ${otherUserWindowAndAudioAndParticipantsInfo.border_g}, ${otherUserWindowAndAudioAndParticipantsInfo.border_b}, ${otherUserWindowAndAudioAndParticipantsInfo.border_a})`
   }), [ otherUserWindowAndAudioAndParticipantsInfo ]);
+
+  // const div_active_after_conference_Ref = useRef<HTMLDivElement>(null); // 会議中に表示されるコンポーネントへのrefを作成
+  // const [div_active_after_conference_Height, setDiv_active_after_conference_Height] = useState<number | null>(null); // 会議中に表示されるコンポーネントの高さ
+
+  // 会議中に表示されるコンポーネントの高さを取得
+  // useEffect(() => {
+  //   if (div_active_after_conference_Ref.current) {
+  //     // ref経由でdivの高さを取得
+  //     const height = div_active_after_conference_Ref.current.offsetHeight;
+  //     setDiv_active_after_conference_Height(height); // stateに保存
+  //   }
+  // }, []); // 初回レンダリング時のみ実行
 
   useEffect(() => {
     // eslint-disable-next-line
