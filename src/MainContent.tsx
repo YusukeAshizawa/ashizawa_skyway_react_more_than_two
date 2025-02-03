@@ -452,9 +452,20 @@ export const MainContent = () => {
     const initialize = async () => {
       if (token == null || localVideo.current == null) return;
 
+      // カメラの種類の確認
+      const devices = await SkyWayStreamFactory.enumerateInputVideoDevices();
+      // eslint-disable-next-line
+      console.log(devices);  // デバッグ用
+
       const stream = 
-        await SkyWayStreamFactory.createMicrophoneAudioAndCameraStream();
+        await SkyWayStreamFactory.createMicrophoneAudioAndCameraStream({video: {deviceId: devices[0].id}});
       stream.video.attach(localVideo.current);
+
+      // eslint-disable-next-line
+      console.log([token, localVideo]);
+
+      // eslint-disable-next-line
+      console.log(stream);  // デバッグ用
 
       const dataStream = await SkyWayStreamFactory.createDataStream();
 

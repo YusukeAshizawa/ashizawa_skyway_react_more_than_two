@@ -17,8 +17,8 @@
 
 /* 自分側のウィンドウの大きさを調整 */
 #local-video {
-  max-width: 1000px;  /*ウィンドウの横幅の最大値*/
-  max-height: 1000px;  /*ウィンドウの縦幅の最大値*/
+  max-width: 1000px;
+  max-height: 1000px;
   display: none;
   border: 10px solid rgba(255, 255, 255, 0);
 }
