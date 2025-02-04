@@ -1,4 +1,4 @@
-import { LocalAudioStream, LocalDataStream, LocalP2PRoomMember, LocalStream, LocalVideoStream, nowInSec, RemoteDataStream, RoomPublication, SkyWayAuthToken, SkyWayContext, SkyWayRoom, SkyWayStreamFactory, uuidV4 } from "@skyway-sdk/room";
+import { LocalAudioStream, LocalDataStream, LocalP2PRoomMember, LocalStream, LocalVideoStream, MediaDevice, nowInSec, RemoteDataStream, RoomPublication, SkyWayAuthToken, SkyWayContext, SkyWayRoom, SkyWayStreamFactory, uuidV4 } from "@skyway-sdk/room";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { RemoteMedia } from "./RemoteMedia";
 import "./MainContent.css"
@@ -7,7 +7,7 @@ import { Camera } from "@mediapipe/camera_utils";
 import Webcam from "react-webcam";
 import { CSVLink } from "react-csv";
 // import webgazer, { GazeData } from 'webgazer';
-import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
+// import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 
 // 参加者ID
 let participantID = 1;
@@ -16,10 +16,10 @@ let conditionID = 1;
 // 条件名
 let conditionName = "Baseline";
 // ルーム名
-let roomName = "";
+// let roomName = "";
 
 // CSVファイルとして書き出すデータの収集を開始するタイミングの制御
-let nowTest = false;
+// let nowTest = false;
 // 計測スタート時間
 let startTime = 0;
 
@@ -446,31 +446,44 @@ export const MainContent = () => {
   // eslint-disable-next-line
   // console.log(otherUserDataStream);  // デバッグ用
 
+  const [devices, setDevices] = React.useState<MediaDeviceInfo[]>([]);
+
   // tokenとvideo要素の参照ができたら実行
   // ビデオの初期設定
   useEffect(() => {
     const initialize = async () => {
       if (token == null || localVideo.current == null) return;
 
-      // カメラの種類の確認
-      const devices = await SkyWayStreamFactory.enumerateInputVideoDevices();
-      // eslint-disable-next-line
-      console.log(devices);  // デバッグ用
-
-      const stream = 
-        await SkyWayStreamFactory.createMicrophoneAudioAndCameraStream({video: {deviceId: devices[0].id}});
-      stream.video.attach(localVideo.current);
-
-      // eslint-disable-next-line
-      console.log([token, localVideo]);
+      // カメラの種類の選択
+      // console.log("-----------");
+      // const devices_tmp = (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.label === "OBS-Camera");
+      const devices_tmp = (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.kind === "videoinput");
+      console.log(devices_tmp);
+      setDevices(devices_tmp);
+      // SkyWayStreamFactory.enumerateInputVideoDevices().then((raw_devices) => {
+      //   setDevices(raw_devices)
+      // })
 
       // eslint-disable-next-line
-      console.log(stream);  // デバッグ用
+      // console.log(devices);  // デバッグ用
+
+      // const stream = 
+      //   await SkyWayStreamFactory.createMicrophoneAudioAndCameraStream({video: {deviceId: devices[0].id}});
+      if(localStream == null) {
+        const stream = 
+          await SkyWayStreamFactory.createMicrophoneAudioAndCameraStream({video: {deviceId: devices_tmp[0].deviceId}});
+        stream.video.attach(localVideo.current);
+        setLocalStream(stream);
+        // eslint-disable-next-line
+        // console.log(stream);  // デバッグ用
+      }
+
+      // eslint-disable-next-line
+      // console.log([token, localVideo]);
 
       const dataStream = await SkyWayStreamFactory.createDataStream();
 
       await localVideo.current.play();
-      setLocalStream(stream);
       setLocalDataStream(dataStream);
     };
 
@@ -525,14 +538,14 @@ export const MainContent = () => {
   const CSV_HeadDirection_Ref = useRef<CSVLink & HTMLAnchorElement & { link: HTMLAnchorElement }>(null);
   const [headDirectionResults, setHeadDirectionResults] = useState<CSV_HeadDirection_Info[]>([]);
   // 自分・会話相手の視線のログデータをCSVファイルとして書き出す
-  const CSV_Gaze_Ref = useRef<CSVLink & HTMLAnchorElement & { link: HTMLAnchorElement }>(null);
-  const [gazeResults, setGazeResults] = useState<CSV_Gaze_Info[]>([]);
+  // const CSV_Gaze_Ref = useRef<CSVLink & HTMLAnchorElement & { link: HTMLAnchorElement }>(null);
+  // const [gazeResults, setGazeResults] = useState<CSV_Gaze_Info[]>([]);
   // 音声データをCSVファイルとして書き出す
-  const CSV_AudioAndParticipants_Ref = useRef<CSVLink & HTMLAnchorElement & { link: HTMLAnchorElement }>(null);
-  const [audioAndParticipantsResults, setAudioAndParticipantsResults] = useState<CSV_AudioAndParticipants_Info[]>([]);
+  // const CSV_AudioAndParticipants_Ref = useRef<CSVLink & HTMLAnchorElement & { link: HTMLAnchorElement }>(null);
+  // const [audioAndParticipantsResults, setAudioAndParticipantsResults] = useState<CSV_AudioAndParticipants_Info[]>([]);
   // 会話全体の発話内容のログデータをCSVファイルとして書き出す
-  const CSV_Talk_Ref = useRef<CSVLink & HTMLAnchorElement & { link: HTMLAnchorElement }>(null);
-  const [talkResults, setTalkResults] = useState<CSV_Talk_Info[]>([]);
+  // const CSV_Talk_Ref = useRef<CSVLink & HTMLAnchorElement & { link: HTMLAnchorElement }>(null);
+  // const [talkResults, setTalkResults] = useState<CSV_Talk_Info[]>([]);
 
   /** 検出結果（フレーム毎に呼び出される） */
   const onResults = useCallback((results: Results) => {
@@ -615,36 +628,6 @@ export const MainContent = () => {
     }
   },[]);
 
-  useEffect(() => {
-    const faceMesh = new FaceMesh({
-      locateFile: file => {
-        return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
-      }
-    });
-
-    faceMesh.setOptions({
-      maxNumFaces: 1,
-      refineLandmarks: true, // landmarks 468 -> 478
-      minDetectionConfidence: 0.5,
-      minTrackingConfidence: 0.5
-    });
-
-    faceMesh.onResults(onResults);
-
-    if (webcamRef.current) {
-      const camera = new Camera(webcamRef.current.video!, {
-        onFrame: async () => {
-          await faceMesh.send({ image: webcamRef.current!.video! })
-        }
-      });
-      camera.start();
-    }
-
-    return () => {
-        faceMesh.close();
-    }
-  }, [onResults]);
-
   // 他ユーザの座標情報を保持
   // （これを自分のアイコンと同様に画面表示用のstyleに反映する）
   const [ otherUserWindowAndAudioAndParticipantsInfo, setOtherUserWindowAndAudioAndParticipantsInfo ] = useState<WindowAndAudioAndParticipantsInfo>({
@@ -718,9 +701,11 @@ export const MainContent = () => {
 
   // 計測開始時間の定義
   const [startTime_HeadDirection, setStartTime_HeadDirection] = useState<number>(0);
-  const [startTime_Gaze, setStartTime_Gaze] = useState<number>(0);
-  const [startTime_AudioAndParticipants, setStartTime_AudioAndParticipants] = useState<number>(0);
-  const [startTime_Talk, setStartTime_Talk] = useState<number>(0);
+  // const [startTime_Gaze, setStartTime_Gaze] = useState<number>(0);
+  // const [startTime_AudioAndParticipants, setStartTime_AudioAndParticipants] = useState<number>(0);
+  // const [startTime_Talk, setStartTime_Talk] = useState<number>(0);
+
+  const [nowTest, setNowTest] = useState<boolean>(false);
 
   // CSVファイルへの頭部方向・音声データの情報のセット
   useEffect(() => {
@@ -740,12 +725,12 @@ export const MainContent = () => {
               otherPositionX_diff: otherUserWindowAndAudioAndParticipantsInfo.left_diff_inCaseOf_change, otherPositionY_diff: otherUserWindowAndAudioAndParticipantsInfo.top_diff_inCaseOf_change, otherTheta: otherUserWindowAndAudioAndParticipantsInfo.theta, otherDirection: getParticipantDirection(otherUserWindowAndAudioAndParticipantsInfo.theta), otherWindowWidth: otherUserWindowAndAudioAndParticipantsInfo.width_inCaseOf_change }
           ]);
           setStartTime_HeadDirection(nowTime_HeadDirection);
-          const nowTime_AudioAndParticipants = (performance.now() - startTime) / 1000;
-          setAudioAndParticipantsResults((prev) => [
-            ...prev,
-            { ID: participantID, Condition: conditionID, startTime: startTime_AudioAndParticipants, endTime: nowTime_AudioAndParticipants, myStatus: myWindowAndAudioAndParticipantsInfo.status, myText: myWindowAndAudioAndParticipantsInfo.text, otherStatus: otherUserWindowAndAudioAndParticipantsInfo.status, otherText: otherUserWindowAndAudioAndParticipantsInfo.text }
-          ]);
-          setStartTime_AudioAndParticipants(nowTime_AudioAndParticipants);
+          // const nowTime_AudioAndParticipants = (performance.now() - startTime) / 1000;
+          // setAudioAndParticipantsResults((prev) => [
+          //   ...prev,
+          //   { ID: participantID, Condition: conditionID, startTime: startTime_AudioAndParticipants, endTime: nowTime_AudioAndParticipants, myStatus: myWindowAndAudioAndParticipantsInfo.status, myText: myWindowAndAudioAndParticipantsInfo.text, otherStatus: otherUserWindowAndAudioAndParticipantsInfo.status, otherText: otherUserWindowAndAudioAndParticipantsInfo.text }
+          // ]);
+          // setStartTime_AudioAndParticipants(nowTime_AudioAndParticipants);
         }
       }
   }, [ otherUserWindowAndAudioAndParticipantsInfo ]);
@@ -831,6 +816,8 @@ export const MainContent = () => {
   //   }
   // },[webSpeechAudio.transcript]);
 
+  const [roomName, setRoomName] = useState("");
+
   // ルームに入ることができるかの確認
   const canJoin = useMemo(() => {
     return participantID !== -1 && conditionID !== -1 && roomName !== "" && localStream != null && me == null;
@@ -910,6 +897,63 @@ export const MainContent = () => {
 
   const [ otherUserPublications, setOtherUserPublications ] = useState<RoomPublication<LocalStream>[]>([]);
 
+  useEffect(() => {
+    const faceMesh = new FaceMesh({
+      locateFile: file => {
+        return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+      }
+    });
+
+    faceMesh.setOptions({
+      maxNumFaces: 1,
+      refineLandmarks: true, // landmarks 468 -> 478
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5
+    });
+
+    faceMesh.onResults(onResults);
+
+    if (webcamRef.current) {
+      // console.log(webcamRef.current);
+      const camera = new Camera(webcamRef.current.video!, {
+        onFrame: async () => {
+          await faceMesh.send({ image: webcamRef.current!.video! })
+        }
+      });
+      camera.start();
+    }
+
+    // eslint-disable-next-line
+    // console.log(localVideo.current!);
+    // console.log(localVideo.current!.readyState);
+
+    // const stream = navigator.mediaDevices.getUserMedia({
+    //   video: {deviceId: devices[0].deviceId}
+    // });
+
+    // if (localVideo.current! && localVideo.current.readyState !== 0) {
+    //   // eslint-disable-next-line
+    //   console.log(localVideo.current!);
+    //   const camera = new Camera(localVideo.current!, {
+    //     onFrame: async () => {
+    //       await faceMesh.send({ image: localVideo.current! });
+    //     }
+    //   });
+    //   // eslint-disable-next-line
+    //   console.log("MediaPipe用カメラの起動");  // デバッグ用
+    //   // eslint-disable-next-line
+    //   console.log(camera);
+    //   camera.start();
+    // }
+
+    // eslint-disable-next-line
+    // console.log(faceMesh);  // デバッグ用
+
+    return () => {
+        faceMesh.close();
+    }
+  }, [onResults]);
+
   // CSVファイルに書き出すデータの計測開始・計測終了を制御する関数
   const testStart = () => {
     // 頭部方向の書き出し開始
@@ -921,22 +965,22 @@ export const MainContent = () => {
     setStartTime_HeadDirection(0);
 
     // 視線の書き出し開始
-    setGazeResults([
-      { ID: participantID, condition: conditionID, startTime: 0, endTime: 0, myGazeX: 0, myGazeY: 0 }
-    ]);
-    setStartTime_Gaze(0);
+    // setGazeResults([
+    //   { ID: participantID, condition: conditionID, startTime: 0, endTime: 0, myGazeX: 0, myGazeY: 0 }
+    // ]);
+    // setStartTime_Gaze(0);
 
-    // 音声データ・参加者の状態（発話者か否か）の書き出し開始
-    setAudioAndParticipantsResults([
-      { ID: participantID, Condition: conditionID, startTime: 0, endTime: 0, myStatus: false, myText: "", otherStatus: false, otherText: "" }
-    ]);
-    setStartTime_AudioAndParticipants(0);
+    // // 音声データ・参加者の状態（発話者か否か）の書き出し開始
+    // setAudioAndParticipantsResults([
+    //   { ID: participantID, Condition: conditionID, startTime: 0, endTime: 0, myStatus: false, myText: "", otherStatus: false, otherText: "" }
+    // ]);
+    // setStartTime_AudioAndParticipants(0);
 
-    // 会話の内容の書き出し開始
-    setTalkResults([
-      { ID: participantID, Condition: conditionID, startTime: 0, endTime: 0, myStatus: false, myText: "", otherStatus: false, otherText: "" }
-    ]);
-    setStartTime_Talk(0);
+    // // 会話の内容の書き出し開始
+    // setTalkResults([
+    //   { ID: participantID, Condition: conditionID, startTime: 0, endTime: 0, myStatus: false, myText: "", otherStatus: false, otherText: "" }
+    // ]);
+    // setStartTime_Talk(0);
 
     // WebGazer.jsを用いた視線取得開始
     // const webgazer = (window as any).webgazer;
@@ -973,7 +1017,8 @@ export const MainContent = () => {
     // });
 
     startTime = performance.now();
-    nowTest = true;
+    setNowTest(true);
+    // nowTest = true;
   }
 
   // データ計測終了
@@ -984,22 +1029,23 @@ export const MainContent = () => {
       webgazer.setGazeListener((data: any, timestamp: number) => {});
     }
 
-    nowTest = false;
-    SpeechRecognition.stopListening();
+    setNowTest(false);
+    // nowTest = false;
+    // SpeechRecognition.stopListening();
     CSV_HeadDirection_Ref?.current?.link.click();
-    CSV_Gaze_Ref?.current?.link.click();
-    CSV_AudioAndParticipants_Ref?.current?.link.click();
-    CSV_Talk_Ref?.current?.link.click();
+    // CSV_Gaze_Ref?.current?.link.click();
+    // CSV_AudioAndParticipants_Ref?.current?.link.click();
+    // CSV_Talk_Ref?.current?.link.click();
 
     // CSVファイルに書き出すデータをコンソールにも出してみる
     // eslint-disable-next-line
     console.log(headDirectionResults);  // デバッグ用
-    // eslint-disable-next-line
-    console.log(gazeResults);  // デバッグ用
-    // eslint-disable-next-line
-    console.log(audioAndParticipantsResults);  // デバッグ用
-    // eslint-disable-next-line
-    console.log(talkResults);  // デバッグ用
+    // // eslint-disable-next-line
+    // console.log(gazeResults);  // デバッグ用
+    // // eslint-disable-next-line
+    // console.log(audioAndParticipantsResults);  // デバッグ用
+    // // eslint-disable-next-line
+    // console.log(talkResults);  // デバッグ用
   }
   
   return (
@@ -1063,7 +1109,7 @@ export const MainContent = () => {
           {/* <option value="5">PositionAndSizeChange</option> */}
         </select>
         &nbsp;&nbsp;
-        room name: <input type="text" value={roomName} onChange={(e) => { roomName = e.target.value; }} />
+        room name: <input type="text" value={roomName} onChange={(e) => { setRoomName(e.target.value); }} />
         &nbsp;
         <button onClick={onJoinClick} disabled={!canJoin}>join</button>
         </p>
@@ -1076,9 +1122,9 @@ export const MainContent = () => {
         <button onClick={testEnd} disabled={!nowTest}>Measurement End</button>
       </div>
       <CSVLink data={headDirectionResults} filename={`C${conditionID}_ID${participantID}_headDirectionResults.csv`} ref={CSV_HeadDirection_Ref} ></CSVLink>
-      <CSVLink data={gazeResults} filename={`C${conditionID}_ID${participantID}_gazeResults.csv`} ref={CSV_Gaze_Ref} ></CSVLink>
+      {/* <CSVLink data={gazeResults} filename={`C${conditionID}_ID${participantID}_gazeResults.csv`} ref={CSV_Gaze_Ref} ></CSVLink>
       <CSVLink data={audioAndParticipantsResults} filename={`C${conditionID}_ID${participantID}_audioAndParticipantsResults.csv`} ref={CSV_AudioAndParticipants_Ref} ></CSVLink>
-      <CSVLink data={talkResults} filename={`C${conditionID}_ID${participantID}_talkResults.csv`} ref={CSV_Talk_Ref} ></CSVLink>
+      <CSVLink data={talkResults} filename={`C${conditionID}_ID${participantID}_talkResults.csv`} ref={CSV_Talk_Ref} ></CSVLink> */}
       {/* <div className="field-area" tabIndex={-1} onKeyDown={ onKeyDown }> */}
         <div className="icon-container">
           <video id="local-video" ref={localVideo} muted playsInline style={myWindowAndAudioContainerStyle}></video>
