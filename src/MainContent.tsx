@@ -140,7 +140,7 @@ function getParticipantDirection(theta: number) {
 }
 
 // 移動平均計算時のフレーム数
-const MovingAverage_frame = 20;
+const MovingAverage_frame = 35;
 // 移動平均計算用の配列
 let move_top_diffs: number[] = [];
 let move_left_diffs: number[] = [];
