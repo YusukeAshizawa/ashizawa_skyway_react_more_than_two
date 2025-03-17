@@ -35,10 +35,11 @@ interface WindowAndAudioAndParticipantsInfo {
     border_a: number;  // ビデオウィンドウの枠の色の透明度の値
     theta: number;  // 頭部方向（度）
     width_inCaseOf_change: number;  // ビデオウィンドウの大きさを変更した場合の大きさ
-    top_diff_inCaseOf_change: number;  // ビデオウィンドウの位置を変更した場合の上下方向の変化量
-    left_diff_inCaseOf_change: number;  // ビデオウィンドウの位置を変更した場合の左右方向の変化量
+    // top_diff_inCaseOf_change: number;  // ビデオウィンドウの位置を変更した場合の上下方向の変化量
+    // left_diff_inCaseOf_change: number;  // ビデオウィンドウの位置を変更した場合の左右方向の変化量
     status: boolean;  // 発言者か否か
     text: string;  // 発言内容
+    status_gaze: string; // 参加者の状態（注視状態 or 視線回避状態 or ノーマル）
 }
 
 // CSVファイルに書き出す頭部方向の情報
@@ -48,15 +49,17 @@ interface CSV_HeadDirection_Info {
   startTime: number;
   endTime: number;
   myTheta: number;
-  myPositionX_diff: number;
-  myPositionY_diff: number;
+  // myPositionX_diff: number;
+  // myPositionY_diff: number;
   myDirection: string;
   myWindowWidth: number;
+  myStatus_gaze: string;
   otherTheta: number;
-  otherPositionX_diff: number;
-  otherPositionY_diff: number;
+  // otherPositionX_diff: number;
+  // otherPositionY_diff: number;
   otherDirection: string;
   otherWindowWidth: number;
+  otherStatus_gaze: string;
 }
 
 // CSVファイルに書き出す視線の情報
@@ -140,7 +143,7 @@ function getParticipantDirection(theta: number) {
 }
 
 // 移動平均計算時のフレーム数
-const MovingAverage_frame = 35;
+const MovingAverage_frame = 10;
 // 移動平均計算用の配列
 let move_top_diffs: number[] = [];
 let move_left_diffs: number[] = [];
@@ -157,14 +160,15 @@ let scrollMyX = window.scrollX;
 let scrollMyY = window.scrollY;
 
 // ビデオウィンドウの大きさの最小値・最大値
-const width_min = 100;
-const width_max = 500;
+// （最小値：スクリーンの幅の70%・最大値：1000（SkyWayの通信でのウィンドウサイズの最大値））
+const width_max = 1000;
+const width_min = width_max * 0.8;
 // 移動量の拡大率
 const distance_rate_move = 10000;
 
 // ビデオウィンドウの大きさのデフォルト値（参加者・対話相手共通）
 const default_width = (width_min + width_max) / 2;
-const HeightPerWidthRate = 0.75;
+// const HeightPerWidthRate = 0.75;
 
 // 位置の移動を行う場合の，スクリーンの中心からのずれ
 const default_top_diff = 0;
@@ -209,23 +213,23 @@ function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_
   // ビデオウィンドウの枠の色の透明度の変更
   let border_a_value = border_a_max * next_border_a_rate;
 
-  // 移動平均を導入するために，値を保存（ビデオウィンドウの大きさ・ビデオウィンドウの枠の色の透明度）
-  move_width.push(width_value);
-  move_border_a.push(border_a_value);
+  // // 移動平均を導入するために，値を保存（ビデオウィンドウの大きさ・ビデオウィンドウの枠の色の透明度）
+  // move_width.push(width_value);
+  // move_border_a.push(border_a_value);
 
-  // 移動平均の計算 + リストの肥大化の防止（ビデオウィンドウの大きさ）
-  if (move_width.length < MovingAverage_frame) width_value = Average_value(move_width, 0, move_width.length - 1);
-  else{
-    if (move_width.length > MovingAverage_frame + 10) move_width.shift();
-    width_value = Average_value(move_width, move_width.length - MovingAverage_frame, move_width.length - 1);
-  }
+  // // 移動平均の計算 + リストの肥大化の防止（ビデオウィンドウの大きさ）
+  // if (move_width.length < MovingAverage_frame) width_value = Average_value(move_width, 0, move_width.length - 1);
+  // else{
+  //   if (move_width.length > MovingAverage_frame + 10) move_width.shift();
+  //   width_value = Average_value(move_width, move_width.length - MovingAverage_frame, move_width.length - 1);
+  // }
 
-  // 移動平均の計算 + リストの肥大化の防止（ビデオウィンドウの大きさ）
-  if (move_border_a.length < MovingAverage_frame) border_a_value = Average_value(move_border_a, 0, move_border_a.length - 1);
-  else{
-    if (move_border_a.length > MovingAverage_frame + 10) move_border_a.shift();
-    border_a_value = Average_value(move_border_a, move_border_a.length - MovingAverage_frame, move_border_a.length - 1);
-  }
+  // // 移動平均の計算 + リストの肥大化の防止（ビデオウィンドウの大きさ）
+  // if (move_border_a.length < MovingAverage_frame) border_a_value = Average_value(move_border_a, 0, move_border_a.length - 1);
+  // else{
+  //   if (move_border_a.length > MovingAverage_frame + 10) move_border_a.shift();
+  //   border_a_value = Average_value(move_border_a, move_border_a.length - MovingAverage_frame, move_border_a.length - 1);
+  // }
 
   // 最小値の考慮（ビデオウィンドウの大きさ・ビデオウィンドウの枠の色の透明度）
   if (width_value < width_min) width_value = width_min;
@@ -237,6 +241,36 @@ function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_
   // eslint-disable-next-line
   // console.log(myWindowWidth_tmp_value);  // デバッグ用
 
+  // 移動平均を導入するために，値を保存（ビデオウィンドウの大きさ・ビデオウィンドウの枠の色の透明度）
+  move_width.push(width_value);
+  move_border_a.push(border_a_value);
+
+  // 移動平均の計算 + リストの肥大化の防止（ビデオウィンドウの大きさ）
+  if (move_width.length < MovingAverage_frame) width_value = Average_value(move_width, 0, move_width.length - 1);
+  else{
+    if (move_width.length > MovingAverage_frame + 3) move_width.shift();
+    width_value = Average_value(move_width, move_width.length - MovingAverage_frame, move_width.length - 1);
+  }
+
+  // 移動平均の計算 + リストの肥大化の防止（ビデオウィンドウの大きさ）
+  if (move_border_a.length < MovingAverage_frame) border_a_value = Average_value(move_border_a, 0, move_border_a.length - 1);
+  else{
+    if (move_border_a.length > MovingAverage_frame + 3) move_border_a.shift();
+    border_a_value = Average_value(move_border_a, move_border_a.length - MovingAverage_frame, move_border_a.length - 1);
+  }
+
+  // 参加者の状態（注視状態 or 視線回避状態 or ノーマル）
+  let status_gaze = "";
+  
+  // ビデオウィンドウの大きさが最大値の10%以内の時には，注視状態であると判断する
+  if (myWindowWidth_tmp_value > width_max - (width_max - width_min) * 0.1) {
+    status_gaze = "mutual gaze";
+  }
+  // ビデオウィンドウの大きさが最小値の10%以内の時には，視線回避状態であると判断する
+  if (myWindowWidth_tmp_value < width_min + (width_max - width_min) * 0.1) {
+    status_gaze = "gaze aversion";
+  }
+
   // BaseLine条件・PositionChange・FrameChange条件の時には，top・leftの値にwidth_valueの値が影響を与えないようにするために，width_valueの値を更新
   if (conditionID === 1 || conditionID === 2 || conditionID === 4) width_value = default_width;
 
@@ -245,20 +279,20 @@ function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_
   let left_diff_value = distance_rate_move * Norm(fc_d_from_fc_vector) * Math.cos(rad_head_direction - Math.PI);
 
   // 移動平均を導入するために，値を保存（ビデオウィンドウのスクリーン中心からのずれ）
-  move_top_diffs.push(top_diff_value);
-  move_left_diffs.push(left_diff_value);
+  // move_top_diffs.push(top_diff_value);
+  // move_left_diffs.push(left_diff_value);
 
-  // 移動平均の計算 + リストの肥大化の防止（ビデオウィンドウのスクリーン中心からのずれ）
-  if (move_top_diffs.length < MovingAverage_frame) top_diff_value = Average_value(move_top_diffs, 0, move_top_diffs.length - 1);
-  else{
-    if (move_top_diffs.length > MovingAverage_frame + 10) move_top_diffs.shift();
-    top_diff_value = Average_value(move_top_diffs, move_top_diffs.length - MovingAverage_frame, move_top_diffs.length - 1);
-  }
-  if (move_left_diffs.length < MovingAverage_frame) left_diff_value = Average_value(move_left_diffs, 0, move_left_diffs.length - 1);
-  else{
-    if (move_left_diffs.length > MovingAverage_frame + 10) move_left_diffs.shift();
-    left_diff_value = Average_value(move_left_diffs, move_left_diffs.length - MovingAverage_frame, move_left_diffs.length - 1);
-  }
+  // // 移動平均の計算 + リストの肥大化の防止（ビデオウィンドウのスクリーン中心からのずれ）
+  // if (move_top_diffs.length < MovingAverage_frame) top_diff_value = Average_value(move_top_diffs, 0, move_top_diffs.length - 1);
+  // else{
+  //   if (move_top_diffs.length > MovingAverage_frame + 10) move_top_diffs.shift();
+  //   top_diff_value = Average_value(move_top_diffs, move_top_diffs.length - MovingAverage_frame, move_top_diffs.length - 1);
+  // }
+  // if (move_left_diffs.length < MovingAverage_frame) left_diff_value = Average_value(move_left_diffs, 0, move_left_diffs.length - 1);
+  // else{
+  //   if (move_left_diffs.length > MovingAverage_frame + 10) move_left_diffs.shift();
+  //   left_diff_value = Average_value(move_left_diffs, move_left_diffs.length - MovingAverage_frame, move_left_diffs.length - 1);
+  // }
 
   let newInfo: WindowAndAudioAndParticipantsInfo;
 
@@ -268,17 +302,18 @@ function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_
         top_diff: default_top_diff,
         left_diff: default_left_diff,
         width: default_width,
-        height: default_width * HeightPerWidthRate,
+        height: default_width, //  * HeightPerWidthRate,
         border_r: default_border_r,
         border_g: default_border_g,
         border_b: default_border_b,
         border_a: default_border_a,
         width_inCaseOf_change: myWindowWidth_tmp_value,
-        top_diff_inCaseOf_change: top_diff_value,
-        left_diff_inCaseOf_change: left_diff_value,
+        // top_diff_inCaseOf_change: top_diff_value,
+        // left_diff_inCaseOf_change: left_diff_value,
         theta: theta_head_direction,
         status: status,
-        text: text
+        text: text,
+        status_gaze: status_gaze
       };
       break;
     case 2:  // FrameChange条件
@@ -286,17 +321,18 @@ function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_
         top_diff: default_top_diff,
         left_diff: default_left_diff,
         width: default_width,
-        height: default_width * HeightPerWidthRate,
+        height: default_width, //  * HeightPerWidthRate,
         border_r: default_border_r,
         border_g: default_border_g,
         border_b: default_border_b,
         border_a: border_a_value,
         width_inCaseOf_change: myWindowWidth_tmp_value,
-        top_diff_inCaseOf_change: top_diff_value,
-        left_diff_inCaseOf_change: left_diff_value,
+        // top_diff_inCaseOf_change: top_diff_value,
+        // left_diff_inCaseOf_change: left_diff_value,
         theta: theta_head_direction,
         status: status,
-        text: text
+        text: text,
+        status_gaze: status_gaze
       }
       break;
     case 3:  // SizeChange条件
@@ -304,17 +340,18 @@ function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_
         top_diff: default_top_diff,
         left_diff: default_left_diff,
         width: width_value,
-        height: width_value * HeightPerWidthRate,
+        height: width_value, //  * HeightPerWidthRate,
         border_r: default_border_r,
         border_g: default_border_g,
         border_b: default_border_b,
         border_a: default_border_a,
         width_inCaseOf_change: myWindowWidth_tmp_value,
-        top_diff_inCaseOf_change: top_diff_value,
-        left_diff_inCaseOf_change: left_diff_value,
+        // top_diff_inCaseOf_change: top_diff_value,
+        // left_diff_inCaseOf_change: left_diff_value,
         theta: theta_head_direction,
         status: status,
-        text: text
+        text: text,
+        status_gaze: status_gaze
       };
       break;
     case 4:  // PositionChange条件
@@ -322,17 +359,18 @@ function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_
         top_diff: top_diff_value,
         left_diff: left_diff_value,
         width: default_width,
-        height: default_width * HeightPerWidthRate,
+        height: default_width, //  * HeightPerWidthRate,
         border_r: default_border_r,
         border_g: default_border_g,
         border_b: default_border_b,
         border_a: default_border_a,
         width_inCaseOf_change: myWindowWidth_tmp_value,
-        top_diff_inCaseOf_change: top_diff_value,
-        left_diff_inCaseOf_change: left_diff_value,
+        // top_diff_inCaseOf_change: top_diff_value,
+        // left_diff_inCaseOf_change: left_diff_value,
         theta: theta_head_direction,
         status: status,
-        text: text
+        text: text,
+        status_gaze: status_gaze
       };
       break;
     case 5:  // PositionAndSizeChange条件
@@ -340,17 +378,18 @@ function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_
         top_diff: top_diff_value,
         left_diff: left_diff_value,
         width: width_value,
-        height: width_value * HeightPerWidthRate,
+        height: width_value, //  * HeightPerWidthRate,
         border_r: default_border_r,
         border_g: default_border_g,
         border_b: default_border_b,
         border_a: default_border_a,
         width_inCaseOf_change: myWindowWidth_tmp_value,
-        top_diff_inCaseOf_change: top_diff_value,
-        left_diff_inCaseOf_change: left_diff_value,
+        // top_diff_inCaseOf_change: top_diff_value,
+        // left_diff_inCaseOf_change: left_diff_value,
         theta: theta_head_direction,
         status: status,
-        text: text
+        text: text,
+        status_gaze: status_gaze
       };
       break;
     default:  // Baseline条件
@@ -358,17 +397,18 @@ function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_
         top_diff: default_top_diff,
         left_diff: default_left_diff,
         width: default_width,
-        height: default_width * HeightPerWidthRate,
+        height: default_width, //  * HeightPerWidthRate,
         border_r: default_border_r,
         border_g: default_border_g,
         border_b: default_border_b,
         border_a: default_border_a,
         width_inCaseOf_change: myWindowWidth_tmp_value,
-        top_diff_inCaseOf_change: top_diff_value,
-        left_diff_inCaseOf_change: left_diff_value,
+        // top_diff_inCaseOf_change: top_diff_value,
+        // left_diff_inCaseOf_change: left_diff_value,
         theta: theta_head_direction,
         status: status,
-        text: text
+        text: text,
+        status_gaze: status_gaze
       };
       break;
   }
@@ -456,8 +496,15 @@ export const MainContent = () => {
 
       // カメラの種類の選択
       // console.log("-----------");
-      // const devices_tmp = (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.label === "OBS-Camera");
-      const devices_tmp = (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.kind === "videoinput");
+      navigator.mediaDevices.getUserMedia({
+        video: {frameRate: 30}
+      }).then((stream) => {
+        // eslint-disable-next-line
+        console.log(stream);  // デバッグ用
+      }
+      ).catch(console.error);
+      const devices_tmp = (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.label.includes("USB Camera"));
+      // const devices_tmp = (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.kind === "videoinput");
       console.log(devices_tmp);
       setDevices(devices_tmp);
       // SkyWayStreamFactory.enumerateInputVideoDevices().then((raw_devices) => {
@@ -468,10 +515,10 @@ export const MainContent = () => {
       // console.log(devices);  // デバッグ用
 
       // const stream = 
-      //   await SkyWayStreamFactory.createMicrophoneAudioAndCameraStream({video: {deviceId: devices[0].id}});
+      //     await SkyWayStreamFactory.createMicrophoneAudioAndCameraStream({video: {deviceId: devices_tmp[0].deviceId}});
       if(localStream == null) {
         const stream = 
-          await SkyWayStreamFactory.createMicrophoneAudioAndCameraStream({video: {deviceId: devices_tmp[0].deviceId}});
+          await SkyWayStreamFactory.createMicrophoneAudioAndCameraStream();
         stream.video.attach(localVideo.current);
         setLocalStream(stream);
         // eslint-disable-next-line
@@ -494,14 +541,16 @@ export const MainContent = () => {
 
   // 自分自身のウィンドウの位置・大きさの調整
   const [ myWindowAndAudioAndParticipantsInfo, setMyWindowAndAudioAndParticipantsInfo ] = useState<WindowAndAudioAndParticipantsInfo>({ 
-    top_diff: default_top_diff, left_diff: default_left_diff, width: default_width, height: default_width * HeightPerWidthRate,
+    top_diff: default_top_diff, left_diff: default_left_diff, width: default_width, height: default_width, //  * HeightPerWidthRate,
     border_r: default_border_r, border_g: default_border_g, border_b: default_border_b, border_a: default_border_a, 
-    width_inCaseOf_change: 0, top_diff_inCaseOf_change: 0, left_diff_inCaseOf_change: 0, theta: 0, status: false, text: ""
+    width_inCaseOf_change: 0, 
+    // top_diff_inCaseOf_change: 0, left_diff_inCaseOf_change: 0, 
+    theta: 0, status: false, text: "", status_gaze: ""
   });
 
   const Text_height = 25;  // テキスト部分の高さ
 
-  // フィールド領域をはみ出ないように調整を入れる
+  // 参加者側のビデオウィンドウのパラメータ（要修正（会話相手側のビデオウィンドウのパラメータに合わせる））
   const myWindowAndAudioContainerStyle = useMemo<React.CSSProperties>(() => ({
       position: "absolute",
       top: scrollMyY + screenMyHeight / 2 - myWindowAndAudioAndParticipantsInfo.height / 2 + myWindowAndAudioAndParticipantsInfo.top_diff < 0 ? 0 :
@@ -631,30 +680,41 @@ export const MainContent = () => {
   // 他ユーザの座標情報を保持
   // （これを自分のアイコンと同様に画面表示用のstyleに反映する）
   const [ otherUserWindowAndAudioAndParticipantsInfo, setOtherUserWindowAndAudioAndParticipantsInfo ] = useState<WindowAndAudioAndParticipantsInfo>({
-    top_diff: default_top_diff, left_diff: default_left_diff, width: default_width, height: default_width * HeightPerWidthRate,
+    top_diff: default_top_diff, left_diff: default_left_diff, width: default_width, height: default_width, //  * HeightPerWidthRate,
     border_r: default_border_r, border_g: default_border_g, border_b: default_border_b, border_a: default_border_a, 
-    top_diff_inCaseOf_change: 0, left_diff_inCaseOf_change: 0, width_inCaseOf_change: 0, theta: 0, status: false, text: ""
+    // top_diff_inCaseOf_change: 0, left_diff_inCaseOf_change: 0, 
+    width_inCaseOf_change: 0, theta: 0, status: false, text: "", status_gaze: ""
    });
 
   // 他ユーザのウィンドウの位置・大きさの変更
   // フィールド領域をはみ出ないように調整を入れる（これ，要る？）
   const otherUserWindowAndAudioContainerStyle = useMemo<React.CSSProperties>(() => ({
     position: "absolute",
-    top: window.screenTop + scrollMyY - Text_height - (window.outerHeight - window.innerHeight)  // デフォルト（初期位置）
-         + window.screen.height / 2  // スクリーンの高さの半分
+    top: // window.screenTop + scrollMyY - Text_height - (window.outerHeight - window.innerHeight)  // デフォルト（初期位置）
+         0 + window.screen.height / 2  // スクリーンの高さの半分
          - otherUserWindowAndAudioAndParticipantsInfo.height / 2 + otherUserWindowAndAudioAndParticipantsInfo.top_diff // ビデオウィンドウが中央に来るように調整
-         < 0 ? 0 :  // 画面上下にはみ出ないように調整
-         window.screenTop + scrollMyY - Text_height - (window.outerHeight - window.innerHeight) + window.screen.height / 2 - otherUserWindowAndAudioAndParticipantsInfo.height / 2 + otherUserWindowAndAudioAndParticipantsInfo.top_diff 
-         > window.screenTop + scrollMyY - Text_height - (window.outerHeight - window.innerHeight) + window.screen.height - otherUserWindowAndAudioAndParticipantsInfo.height ? window.screenTop + scrollMyY - Text_height - (window.outerHeight - window.innerHeight) + window.screen.height - otherUserWindowAndAudioAndParticipantsInfo.height : 
-         window.screenTop + scrollMyY - Text_height - (window.outerHeight - window.innerHeight) // デフォルト（初期位置）
-         + window.screen.height / 2  // スクリーンの高さの半分
+         < 0 ? 0 :  // 画面上にはみ出ないように調整
+         // window.screenTop + scrollMyY - Text_height - (window.outerHeight - window.innerHeight)  // デフォルト（初期位置）
+         0 + window.screen.height / 2  // スクリーンの高さの半分
+         - otherUserWindowAndAudioAndParticipantsInfo.height / 2 + otherUserWindowAndAudioAndParticipantsInfo.top_diff // ビデオウィンドウが中央に来るように調整
+         > // window.screenTop + scrollMyY - Text_height - (window.outerHeight - window.innerHeight) 
+         0 + window.screen.height - otherUserWindowAndAudioAndParticipantsInfo.height  // 画面下にはみ出ないように調整
+         ? // window.screenTop + scrollMyY - Text_height - (window.outerHeight - window.innerHeight)  // デフォルト（初期位置）
+         0 + window.screen.height - otherUserWindowAndAudioAndParticipantsInfo.height : 
+         // window.screenTop + scrollMyY - Text_height - (window.outerHeight - window.innerHeight) // デフォルト（初期位置）
+         0 + window.screen.height / 2  // スクリーンの高さの半分
          - otherUserWindowAndAudioAndParticipantsInfo.height / 2 + otherUserWindowAndAudioAndParticipantsInfo.top_diff, // ビデオウィンドウが中央に来るように調整
     left: window.screenLeft + scrollMyX  // デフォルト（初期位置）
           + window.screen.width / 2 // ウィンドウの幅の半分
           - otherUserWindowAndAudioAndParticipantsInfo.width / 2 + otherUserWindowAndAudioAndParticipantsInfo.left_diff // ビデオウィンドウが中央に来るように調整
-          < 0 ? 0 :  // 画面左右にはみ出ないように調整
-          window.screenLeft + scrollMyX + window.screen.width / 2 - otherUserWindowAndAudioAndParticipantsInfo.width / 2 + otherUserWindowAndAudioAndParticipantsInfo.left_diff 
-          > window.screenLeft + scrollMyX + window.screen.width - otherUserWindowAndAudioAndParticipantsInfo.width ? window.screenLeft + scrollMyX + window.screen.width - otherUserWindowAndAudioAndParticipantsInfo.width : 
+          < 0 ? 0 :  // 画面左にはみ出ないように調整
+          window.screenLeft + scrollMyX  // デフォルト（初期位置）
+          + window.screen.width / 2  // ウィンドウの幅の半分 
+          - otherUserWindowAndAudioAndParticipantsInfo.width / 2 + otherUserWindowAndAudioAndParticipantsInfo.left_diff // ビデオウィンドウが中央に来るように調整
+          > window.screenLeft + scrollMyX  // デフォルト（初期位置）
+          + window.screen.width - otherUserWindowAndAudioAndParticipantsInfo.width  // 画面右にはみ出ないように調整
+          ? window.screenLeft + scrollMyX // デフォルト（初期位置）
+          + window.screen.width - otherUserWindowAndAudioAndParticipantsInfo.width : 
           window.screenLeft + scrollMyX  // デフォルト（初期位置）
           + window.screen.width / 2 // ウィンドウの幅の半分
           - otherUserWindowAndAudioAndParticipantsInfo.width / 2 + otherUserWindowAndAudioAndParticipantsInfo.left_diff, // ビデオウィンドウが中央に来るように調整
@@ -721,8 +781,10 @@ export const MainContent = () => {
           setHeadDirectionResults((prev) => [
             ...prev,
             { ID: participantID, condition: conditionID, startTime: startTime_HeadDirection, endTime: nowTime_HeadDirection, myTheta: myWindowAndAudioAndParticipantsInfo.theta, 
-              myPositionX_diff: myWindowAndAudioAndParticipantsInfo.left_diff_inCaseOf_change, myPositionY_diff: myWindowAndAudioAndParticipantsInfo.top_diff_inCaseOf_change, myDirection: getParticipantDirection(myWindowAndAudioAndParticipantsInfo.theta), myWindowWidth: myWindowAndAudioAndParticipantsInfo.width_inCaseOf_change, 
-              otherPositionX_diff: otherUserWindowAndAudioAndParticipantsInfo.left_diff_inCaseOf_change, otherPositionY_diff: otherUserWindowAndAudioAndParticipantsInfo.top_diff_inCaseOf_change, otherTheta: otherUserWindowAndAudioAndParticipantsInfo.theta, otherDirection: getParticipantDirection(otherUserWindowAndAudioAndParticipantsInfo.theta), otherWindowWidth: otherUserWindowAndAudioAndParticipantsInfo.width_inCaseOf_change }
+              // myPositionX_diff: myWindowAndAudioAndParticipantsInfo.left_diff_inCaseOf_change, myPositionY_diff: myWindowAndAudioAndParticipantsInfo.top_diff_inCaseOf_change, 
+              myDirection: getParticipantDirection(myWindowAndAudioAndParticipantsInfo.theta), myWindowWidth: myWindowAndAudioAndParticipantsInfo.width_inCaseOf_change, myStatus_gaze: myWindowAndAudioAndParticipantsInfo.status_gaze,
+              // otherPositionX_diff: otherUserWindowAndAudioAndParticipantsInfo.left_diff_inCaseOf_change, otherPositionY_diff: otherUserWindowAndAudioAndParticipantsInfo.top_diff_inCaseOf_change, 
+              otherTheta: otherUserWindowAndAudioAndParticipantsInfo.theta, otherDirection: getParticipantDirection(otherUserWindowAndAudioAndParticipantsInfo.theta), otherWindowWidth: otherUserWindowAndAudioAndParticipantsInfo.width_inCaseOf_change, otherStatus_gaze: otherUserWindowAndAudioAndParticipantsInfo.status_gaze }
           ]);
           setStartTime_HeadDirection(nowTime_HeadDirection);
           // const nowTime_AudioAndParticipants = (performance.now() - startTime) / 1000;
@@ -913,9 +975,9 @@ export const MainContent = () => {
 
     faceMesh.onResults(onResults);
 
-    if (webcamRef.current) {
+    if (localVideo.current) {
       // console.log(webcamRef.current);
-      const camera = new Camera(webcamRef.current.video!, {
+      const camera = new Camera(webcamRef.current!.video!, {
         onFrame: async () => {
           await faceMesh.send({ image: webcamRef.current!.video! })
         }
@@ -959,8 +1021,12 @@ export const MainContent = () => {
     // 頭部方向の書き出し開始
     setHeadDirectionResults([
       { ID: participantID, condition: conditionID, startTime: 0, endTime:0, 
-        myTheta: 0, myPositionX_diff: 0, myPositionY_diff: 0, myDirection: "", myWindowWidth: 0, 
-        otherTheta: 0, otherPositionX_diff: 0, otherPositionY_diff: 0, otherDirection: "", otherWindowWidth: 0 }
+        myTheta: 0, 
+        // myPositionX_diff: 0, myPositionY_diff: 0, 
+        myDirection: "", myWindowWidth: 0, myStatus_gaze: "",
+        otherTheta: 0, 
+        // otherPositionX_diff: 0, otherPositionY_diff: 0, 
+        otherDirection: "", otherWindowWidth: 0, otherStatus_gaze: "" }
     ]);
     setStartTime_HeadDirection(0);
 
@@ -1128,7 +1194,7 @@ export const MainContent = () => {
       {/* <div className="field-area" tabIndex={-1} onKeyDown={ onKeyDown }> */}
         <div className="icon-container">
           <video id="local-video" ref={localVideo} muted playsInline style={myWindowAndAudioContainerStyle}></video>
-          <Webcam id="local-video" ref={webcamRef} muted playsInline style={myWindowAndAudioContainerStyle}/>
+          <Webcam id="local-video" ref={webcamRef} videoConstraints={{ deviceId: devices?.[0]?.deviceId }} muted playsInline style={myWindowAndAudioContainerStyle}/>
         </div>
         <div className="icon-container">
         {
