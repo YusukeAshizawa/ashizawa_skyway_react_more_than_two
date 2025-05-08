@@ -244,9 +244,12 @@ function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_
   // ビデオウィンドウの離散変化のための，ウィンドウの大きさの保存（ビデオウィンドウの大きさ）
   let width_value_discrete = width_min;
   if (width_value > width_max - (width_max - width_min) * 0.1) {
-    width_value_discrete = width_max;
+    width_value_discrete = width_max;  // 最大サイズ
   }
-  else width_value_discrete = width_min;
+  // else if (width_value > width_min + (width_max - width_min) * 0.1) {
+  //   width_value_discrete = (width_min + width_max) / 2;  // 中間サイズ
+  // }
+  else width_value_discrete = width_min;  // 最小サイズ
 
   // 移動平均を導入するために，値を保存（ビデオウィンドウの大きさ・ビデオウィンドウの枠の色の透明度）
   move_width.push(width_value);
