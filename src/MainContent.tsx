@@ -241,6 +241,13 @@ function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_
   // eslint-disable-next-line
   // console.log(myWindowWidth_tmp_value);  // デバッグ用
 
+  // ビデオウィンドウの離散変化のための，ウィンドウの大きさの保存（ビデオウィンドウの大きさ）
+  let width_value_discrete = width_min;
+  if (width_value > width_max - (width_max - width_min) * 0.1) {
+    width_value_discrete = width_max;
+  }
+  else width_value_discrete = width_min;
+
   // 移動平均を導入するために，値を保存（ビデオウィンドウの大きさ・ビデオウィンドウの枠の色の透明度）
   move_width.push(width_value);
   move_border_a.push(border_a_value);
@@ -272,7 +279,7 @@ function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_
   }
 
   // BaseLine条件・PositionChange・FrameChange条件の時には，top・leftの値にwidth_valueの値が影響を与えないようにするために，width_valueの値を更新
-  if (conditionID === 1 || conditionID === 2 || conditionID === 4) width_value = default_width;
+  if (conditionID === 1 || conditionID === 2 || conditionID === 5) width_value = default_width;
 
   // 2. ビデオウィンドウのスクリーン中心からのずれの算出
   let top_diff_value = distance_rate_move * Norm(fc_d_from_fc_vector) * Math.sin(rad_head_direction);
@@ -354,7 +361,26 @@ function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_
         status_gaze: status_gaze
       };
       break;
-    case 4:  // PositionChange条件
+    case 4:  // SizeChange_Discrete条件
+      newInfo = {
+        top_diff: default_top_diff,
+        left_diff: default_left_diff,
+        width: width_value_discrete,
+        height: width_value_discrete, //  * HeightPerWidthRate,
+        border_r: default_border_r,
+        border_g: default_border_g,
+        border_b: default_border_b,
+        border_a: default_border_a,
+        width_inCaseOf_change: myWindowWidth_tmp_value,
+        // top_diff_inCaseOf_change: top_diff_value,
+        // left_diff_inCaseOf_change: left_diff_value,
+        theta: theta_head_direction,
+        status: status,
+        text: text,
+        status_gaze: status_gaze
+      };
+      break;
+    case 5:  // PositionChange条件
       newInfo = {
         top_diff: top_diff_value,
         left_diff: left_diff_value,
@@ -373,7 +399,7 @@ function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_
         status_gaze: status_gaze
       };
       break;
-    case 5:  // PositionAndSizeChange条件
+    case 6:  // PositionAndSizeChange条件
       newInfo = {
         top_diff: top_diff_value,
         left_diff: left_diff_value,
@@ -1158,9 +1184,12 @@ export const MainContent = () => {
               conditionName = "SizeChange";
               break;
             case 4:
-              conditionName = "PositionChange";
+              conditionName = "SizeChange_Discrete";
               break;
             case 5:
+              conditionName = "PositionChange";
+              break;
+            case 6:
               conditionName = "PositionAndSizeChange";
               break;
             default:
@@ -1171,8 +1200,9 @@ export const MainContent = () => {
           <option value="1">Baseline</option>
           <option value="2">FrameChange</option>
           <option value="3">SizeChange</option>
-          {/* <option value="4">PositionChange</option> */}          
-          {/* <option value="5">PositionAndSizeChange</option> */}
+          <option value="4">SizeChange_Discrete</option>    
+          {/* <option value="5">PositionChange</option> */}          
+          {/* <option value="6">PositionAndSizeChange</option> */}
         </select>
         &nbsp;&nbsp;
         room name: <input type="text" value={roomName} onChange={(e) => { setRoomName(e.target.value); }} />
