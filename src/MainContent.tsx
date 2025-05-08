@@ -174,11 +174,23 @@ const default_width = (width_min + width_max) / 2;
 const default_top_diff = 0;
 const default_left_diff = 0;
 
-// ビデオウィンドウの枠の色の値
-const default_border_r = 83;
-const default_border_g = 253;
-const default_border_b = 49;
-const default_border_a = 0;
+// ビデオウィンドウの枠の色の値（黒色）
+const default_border_r_black = 0;
+const default_border_g_black = 0;
+const default_border_b_black = 0;
+const default_border_a_black = 0;
+
+// ビデオウィンドウの枠の色の値（緑色）
+const default_border_r_green = 83;
+const default_border_g_green = 253;
+const default_border_b_green = 49;
+const default_border_a_green = 0;
+
+// ビデオウィンドウの枠の色の値（実際に用いる色）
+const default_border_r = default_border_r_black;
+const default_border_g = default_border_g_black;
+const default_border_b = default_border_b_black;
+const default_border_a = default_border_a_black;
 
 // ビデオウィンドウの枠の色の最小値・最大値
 const border_a_min = 0;
