@@ -19,6 +19,14 @@
 #local-video {
   max-width: 1000px;
   max-height: 1000px;
+  /* display: none; */
+  border: 10px solid rgba(255, 255, 255, 0);
+}
+
+/* 自分側のウィンドウ（Webカメラ）を非表示 */
+#local-video-webcam {
+  max-width: 1000px;
+  max-height: 1000px;
   display: none;
   border: 10px solid rgba(255, 255, 255, 0);
 }

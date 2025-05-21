@@ -7,7 +7,7 @@ import { Camera } from "@mediapipe/camera_utils";
 import Webcam from "react-webcam";
 import { CSVLink } from "react-csv";
 // import webgazer, { GazeData } from 'webgazer';
-// import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
+import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 
 // 参加者ID
 let participantID = 1;
@@ -207,6 +207,9 @@ const border_a_min_threshold = 0.015;
 
 // ビデオウィンドウの大きさの一次保存（大きさを変更しない条件でも分析できるようにするため）
 let myWindowWidth_tmp_value = 0;
+
+// 自分自身のビデオウィンドウの大きさのデフォルト値
+const myShowedWindowWidth = 250;
 
 // ビデオウィンドウのInfoの更新+音声データの追加
 function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_vector: number[], rad_head_direction: number, theta_head_direction: number, status: boolean, text: string) {
@@ -597,18 +600,35 @@ export const MainContent = () => {
 
   const Text_height = 25;  // テキスト部分の高さ
 
-  // 参加者側のビデオウィンドウのパラメータ（要修正（会話相手側のビデオウィンドウのパラメータに合わせる））
+  // 参加者側のビデオウィンドウのパラメータ
+  // const myWindowAndAudioContainerStyle = useMemo<React.CSSProperties>(() => ({
+  //     position: "absolute",
+  //     top: scrollMyY + screenMyHeight / 2 - myWindowAndAudioAndParticipantsInfo.height / 2 + myWindowAndAudioAndParticipantsInfo.top_diff < 0 ? 0 :
+  //          scrollMyY + screenMyHeight / 2 - myWindowAndAudioAndParticipantsInfo.height / 2 + myWindowAndAudioAndParticipantsInfo.top_diff > screenMyHeight - myWindowAndAudioAndParticipantsInfo.height ? screenMyHeight - myWindowAndAudioAndParticipantsInfo.height : 
+  //          scrollMyY + screenMyHeight / 2 - myWindowAndAudioAndParticipantsInfo.height / 2 + myWindowAndAudioAndParticipantsInfo.top_diff,
+  //     left: scrollMyX + screenMyWidth / 2 - myWindowAndAudioAndParticipantsInfo.width / 2 + myWindowAndAudioAndParticipantsInfo.left_diff < 0 ? 0 :
+  //           scrollMyX + screenMyWidth / 2 - myWindowAndAudioAndParticipantsInfo.width / 2 + myWindowAndAudioAndParticipantsInfo.left_diff > screenMyWidth - myWindowAndAudioAndParticipantsInfo.width ? screenMyWidth - myWindowAndAudioAndParticipantsInfo.width : 
+  //           scrollMyX + screenMyWidth / 2 - myWindowAndAudioAndParticipantsInfo.width / 2 + myWindowAndAudioAndParticipantsInfo.left_diff,
+  //     width: myWindowAndAudioAndParticipantsInfo.width,
+  //     border: `10px solid rgba(${myWindowAndAudioAndParticipantsInfo.border_r}, ${myWindowAndAudioAndParticipantsInfo.border_g}, ${myWindowAndAudioAndParticipantsInfo.border_b}, ${myWindowAndAudioAndParticipantsInfo.border_a})`
+  // }), [ myWindowAndAudioAndParticipantsInfo ]);
+
+  // 参加者側のビデオウィンドウのパラメータ（右上）
   const myWindowAndAudioContainerStyle = useMemo<React.CSSProperties>(() => ({
-      position: "absolute",
-      top: scrollMyY + screenMyHeight / 2 - myWindowAndAudioAndParticipantsInfo.height / 2 + myWindowAndAudioAndParticipantsInfo.top_diff < 0 ? 0 :
-           scrollMyY + screenMyHeight / 2 - myWindowAndAudioAndParticipantsInfo.height / 2 + myWindowAndAudioAndParticipantsInfo.top_diff > screenMyHeight - myWindowAndAudioAndParticipantsInfo.height ? screenMyHeight - myWindowAndAudioAndParticipantsInfo.height : 
-           scrollMyY + screenMyHeight / 2 - myWindowAndAudioAndParticipantsInfo.height / 2 + myWindowAndAudioAndParticipantsInfo.top_diff,
-      left: scrollMyX + screenMyWidth / 2 - myWindowAndAudioAndParticipantsInfo.width / 2 + myWindowAndAudioAndParticipantsInfo.left_diff < 0 ? 0 :
-            scrollMyX + screenMyWidth / 2 - myWindowAndAudioAndParticipantsInfo.width / 2 + myWindowAndAudioAndParticipantsInfo.left_diff > screenMyWidth - myWindowAndAudioAndParticipantsInfo.width ? screenMyWidth - myWindowAndAudioAndParticipantsInfo.width : 
-            scrollMyX + screenMyWidth / 2 - myWindowAndAudioAndParticipantsInfo.width / 2 + myWindowAndAudioAndParticipantsInfo.left_diff,
-      width: myWindowAndAudioAndParticipantsInfo.width,
-      border: `10px solid rgba(${myWindowAndAudioAndParticipantsInfo.border_r}, ${myWindowAndAudioAndParticipantsInfo.border_g}, ${myWindowAndAudioAndParticipantsInfo.border_b}, ${myWindowAndAudioAndParticipantsInfo.border_a})`
-  }), [ myWindowAndAudioAndParticipantsInfo ]);
+    position: "absolute",
+    top: 0,
+    left: 0,
+    width: myShowedWindowWidth
+  }), [ ]);
+
+  // 参加者側のビデオウィンドウのパラメータ（右下）
+  // const myWindowAndAudioContainerStyle = useMemo<React.CSSProperties>(() => ({
+  //   position: "absolute",
+  //   top: 0,
+  //   left: window.innerWidth - myShowedWindowWidth - 20,
+  //   width: myShowedWindowWidth
+  // }), [ ]);
+
 
   // myWindowPositionが更新された時の処理
   useEffect(() => {
@@ -626,6 +646,12 @@ export const MainContent = () => {
   
   // 音声の初期設定
   // const webSpeechAudio = useSpeechRecognition();
+  const {
+    transcript,
+    listening,
+    resetTranscript,
+    browserSupportsSpeechRecognition
+  } = useSpeechRecognition();
 
   // MediaPipeを用いて，会話相手の頭部方向を取得
   const webcamRef = useRef<Webcam>(null);
@@ -1063,6 +1089,11 @@ export const MainContent = () => {
     }
   }, [onResults]);
 
+  if (!browserSupportsSpeechRecognition) {
+    // eslint-disable-next-line
+    console.error("ブラウザが音声認識をサポートしていません。");  // デバッグ用
+  }
+
   // CSVファイルに書き出すデータの計測開始・計測終了を制御する関数
   const testStart = () => {
     // 頭部方向の書き出し開始
@@ -1121,13 +1152,13 @@ export const MainContent = () => {
 
     // // SpeechRecognition.abortListening();  // 一旦音声リセット
 
-    // // 音声認識の開始
-    // // eslint-disable-next-line
-    // // console.log(SpeechRecognition);  // デバッグ用
-    // SpeechRecognition.startListening({ 
-    //   continuous: true, 
-    //   language: 'ja'
-    // });
+    // 音声認識の開始
+    // eslint-disable-next-line
+    console.log(SpeechRecognition);  // デバッグ用
+    SpeechRecognition.startListening({ 
+      continuous: true, 
+      language: 'ja'
+    });
 
     startTime = performance.now();
     setNowTest(true);
@@ -1144,7 +1175,7 @@ export const MainContent = () => {
 
     setNowTest(false);
     // nowTest = false;
-    // SpeechRecognition.stopListening();
+    SpeechRecognition.stopListening();  // 音声認識の終了
     CSV_HeadDirection_Ref?.current?.link.click();
     // CSV_Gaze_Ref?.current?.link.click();
     // CSV_AudioAndParticipants_Ref?.current?.link.click();
@@ -1242,17 +1273,27 @@ export const MainContent = () => {
       {/* <CSVLink data={gazeResults} filename={`C${conditionID}_ID${participantID}_gazeResults.csv`} ref={CSV_Gaze_Ref} ></CSVLink>
       <CSVLink data={audioAndParticipantsResults} filename={`C${conditionID}_ID${participantID}_audioAndParticipantsResults.csv`} ref={CSV_AudioAndParticipants_Ref} ></CSVLink>
       <CSVLink data={talkResults} filename={`C${conditionID}_ID${participantID}_talkResults.csv`} ref={CSV_Talk_Ref} ></CSVLink> */}
+      <div>
+        {/* <p>Microphone: {listening ? 'on' : 'off'}</p>
+        <button onClick={() => SpeechRecognition.startListening({
+          continuous: true,
+          language: 'ja'
+        })}>Start</button>
+        <button onClick={() => SpeechRecognition.stopListening()}>Stop</button>
+        <button onClick={() => resetTranscript()}>Reset</button> */}
+        <p>トランスクリプト：{transcript}</p>
+      </div>
       {/* <div className="field-area" tabIndex={-1} onKeyDown={ onKeyDown }> */}
-        <div className="icon-container">
-          <video id="local-video" ref={localVideo} muted playsInline style={myWindowAndAudioContainerStyle}></video>
-          <Webcam id="local-video" ref={webcamRef} videoConstraints={{ deviceId: devices?.[0]?.deviceId }} muted playsInline style={myWindowAndAudioContainerStyle}/>
-        </div>
         <div className="icon-container">
         {
           me != null && otherUserPublications.map(p => (
             <RemoteMedia id="remote-video" key={p.id} me={me} publication={p} style={otherUserWindowAndAudioContainerStyle}/>
           ))
         }
+        <div className="icon-container">
+          <video id="local-video" ref={localVideo} muted playsInline style={myWindowAndAudioContainerStyle}></video>
+          <Webcam id="local-video-webcam" ref={webcamRef} videoConstraints={{ deviceId: devices?.[0]?.deviceId }} muted playsInline style={myWindowAndAudioContainerStyle}/>
+        </div>
         </div>
       {/* </div> */}
     </div>
