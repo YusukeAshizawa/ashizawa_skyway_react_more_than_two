@@ -1,4 +1,10 @@
-import { LocalAudioStream, LocalDataStream, LocalP2PRoomMember, LocalStream, LocalVideoStream, MediaDevice, nowInSec, RemoteDataStream, RoomPublication, SkyWayAuthToken, SkyWayContext, SkyWayRoom, SkyWayStreamFactory, uuidV4 } from "@skyway-sdk/room";
+// --- Import Statements ---
+import { 
+  LocalAudioStream, LocalDataStream, LocalP2PRoomMember, LocalStream, LocalVideoStream,
+  RemoteDataStream, RoomPublication,
+  SkyWayAuthToken, SkyWayContext, SkyWayRoom, SkyWayStreamFactory,
+  nowInSec, uuidV4
+} from "@skyway-sdk/room";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { RemoteMedia } from "./RemoteMedia";
 import "./MainContent.css"
@@ -6,413 +12,162 @@ import { FaceMesh, Results } from '@mediapipe/face_mesh';
 import { Camera } from "@mediapipe/camera_utils";
 import Webcam from "react-webcam";
 import { CSVLink } from "react-csv";
-// import webgazer, { GazeData } from 'webgazer';  // 使えそうなら，WebGazer.jsを使う
-import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
+import SpeechRecognition, {  useSpeechRecognition } from 'react-speech-recognition';
 
-// 参加者ID
-let participantID = 1;
-// 条件番号・条件名
-let conditionID = 1;
-// 条件名
-let conditionName = "Baseline";
+// --- Constant Valuale ---
+const AppConstants = {
+  MOVING_AVERAGE_FRAME: 10,  // 移動平均計算時のフレーム数
+  WIDTH_MAX: 1000,  // ビデオウィンドウの大きさの最大値
+  WIDTH_MIN: 800,  // ビデオウィンドウの大きさの最小値
+  DISTANCE_RATE_MOVE: 10000,  // 位置の移動を行う場合の，スクリーンの中心からのずれの拡大率
+  DEFAULT_TOP_DIFF: 0,  // 位置の移動を行う場合の，スクリーンの中心からの上下方向のずれ
+  DEFAULT_LEFT_DIFF: 0,  // 位置の移動を行う場合の，スクリーンの中心からの左右方向のずれ
+  BORDER_ALPHA_MIN: 0,  // ビデオウィンドウの枠の色の透明度の最小値
+  BORDER_ALPHA_MAX: 1,  // ビデオウィンドウの枠の色の透明度の最大値
+  BORDER_ALPHA_MIN_THRESHOLD: 0.015,  // ビデオウィンドウの枠の色を完全に透明にする時の閾値
+  DEFAULT_MY_WINDOW_WIDTH: 250,  // 自分自身のビデオウィンドウの大きさのデフォルト値
+  VOLUME_THRESHOLD: 10,  // 発話と判定するボリュームの閾値（0-255，要調整）
+  SPEAKING_DEBOUNCE_MS: 200,  // 発話開始/終了の判定を安定させるためのデバウンス時間
+  BORDER_COLORS: {
+    GREEN: { r: 83, g: 253, b: 49, a: 0 },  // ビデオウィンドウの枠の色（緑色）
+    BLACK: { r: 0, g: 0, b: 0, a: 0 },  // ビデオウィンドウの枠の色（黒色）
+    RED: { r: 255, g: 0, b: 0, a: 0 },  // ビデオウィンドウの枠の色（赤色）
+  },
+};
+const defaultWidth = (AppConstants.WIDTH_MAX + AppConstants.WIDTH_MIN) / 2;  // ビデオウィンドウの大きさのデフォルト値（参加者・対話相手共通）
+const defaultBorderColor = AppConstants.BORDER_COLORS.GREEN;  // ビデオウィンドウの枠の色のデフォルト値（参加者・対話相手共通）
 
-// 計測スタート時間
-let startTime = 0;
-
-// ビデオウィンドウの情報
+// --- Interfaces ---
 interface WindowAndAudioAndParticipantsInfo {
-    top_diff: number;  // 位置を移動させる場合の上下方向の変化量
-    left_diff: number;  // 位置を移動させる場合の左右方向の変化量
+    topDiff: number;  // 位置を移動させる場合の上下方向の変化量
+    leftDiff: number;  // 位置を移動させる場合の左右方向の変化量
     width: number;
     height: number;  // heightはwidthのHeightPerWidthRate倍
-    border_r: number;  // ビデオウィンドウの枠の色（赤）の値
-    border_g: number;  // ビデオウィンドウの枠の色（緑）の値
-    border_b: number;  // ビデオウィンドウの枠の色（青）の値
-    border_a: number;  // ビデオウィンドウの枠の色の透明度の値
+    borderRed: number;  // ビデオウィンドウの枠の色（赤）の値
+    borderGreen: number;  // ビデオウィンドウの枠の色（緑）の値
+    borderBlue: number;  // ビデオウィンドウの枠の色（青）の値
+    borderAlpha: number;  // ビデオウィンドウの枠の色の透明度の値
+    borderAlphaValueBasedVoice: number;  // 発話タイミングに基づく，枠の色の透明度変化を表す値（自分自身用）
     theta: number;  // 頭部方向（度）
-    width_inCaseOf_change: number;  // ビデオウィンドウの大きさを変更した場合の大きさ
-    // top_diff_inCaseOf_change: number;  // ビデオウィンドウの位置を変更した場合の上下方向の変化量
-    // left_diff_inCaseOf_change: number;  // ビデオウィンドウの位置を変更した場合の左右方向の変化量
-    status: boolean;  // 発言者か否か
-    text: string;  // 発言内容
-    status_gaze: string; // 参加者の状態（注視状態 or 視線回避状態 or ノーマル）
-}
-
-// CSVファイルに書き出す頭部方向の情報
+    widthInCaseOfChange: number;  // ビデオウィンドウの大きさを変更した場合の大きさ
+    isSpeaking: boolean;  // 発言者か否か
+    transcript: string;  // 発言内容
+    gazeStatus: string; // 参加者の状態（注視状態 or 視線回避状態 or ノーマル）
+}  // ビデオウィンドウの情報
 interface CSV_HeadDirection_Info {
   ID: number;
   condition: number;
   startTime: number;
   endTime: number;
   myTheta: number;
-  // myPositionX_diff: number;
-  // myPositionY_diff: number;
   myDirection: string;
   myWindowWidth: number;
-  myStatus_gaze: string;
+  myStatusGaze: string;
+  myIsSpeaking: boolean;
+  myTranscript: string;
   otherTheta: number;
-  // otherPositionX_diff: number;
-  // otherPositionY_diff: number;
   otherDirection: string;
   otherWindowWidth: number;
-  otherStatus_gaze: string;
+  otherStatusGaze: string;
+  otherIsSpeaking: boolean;
+  otherTranscript: string;
+}  // CSVファイルに書き出す頭部方向の情報
+
+// --- Utility Functions ---
+const Utils = {
+  // 数値型リストの要素の平均値を求める関数
+  averageValue: (numberList: number[], startId: number = 0, endId: number = numberList.length - 1) => {
+    let sum = 0;  // 引数のリスト内の要素の合計値
+    for (let i = startId; i < endId + 1; i++) {
+      sum += numberList[i];
+    }
+    return sum / (endId - startId + 1);
+  },
+  // 2つのベクトル（数値型リスト）の内積を求める関数
+  inner: (numberList1: number[], numberList2: number[]) => {
+    return numberList1[0] * numberList2[0] + numberList1[1] * numberList2[1];
+  },
+  // ベクトル（数値型リスト）の長さを求める関数
+  norm: (numberList: number[]) => {
+    return Math.sqrt(numberList[0] * numberList[0] + numberList[1] * numberList[1]);
+  },
+  // 参加者の視線方向を求める関数
+  getParticipantDirection: (theta: number) => {
+    if (theta < 0 || theta > 360) return "Error";
+
+    // 参加者の視線方向を識別
+    if (theta < 22.5 || theta >= 337.5) return "Left";
+    else if (theta >= 22.5 && theta < 67.5) return "LeftDown";
+    else if (theta >= 67.5 && theta < 112.5) return "Down";
+    else if (theta >= 112.5 && theta < 157.5) return "RightDown";
+    else if (theta >= 157.5 && theta < 202.5) return "Right";
+    else if (theta >= 202.5 && theta < 247.5) return "RightUp";
+    else if (theta >= 247.5 && theta < 292.5) return "Up";
+    else if (theta >= 292.5 && theta < 337.5) return "LeftUp";
+    else return "Error";
+  }
 }
 
-// 数値型リストの要素の平均値を求める関数
-function Average_value(number_list: number[], start_id: number = 0, end_id: number = number_list.length - 1) {
-  let sum = 0;  // 引数のリスト内の要素の合計値
-  for (let i = start_id; i < end_id + 1; i++) {
-    sum += number_list[i];
-  }
-  return sum / (end_id - start_id + 1);
-}
+// --- Global Variables（以下すべてuseStateで管理したいが，やり方が分かっていないので，保留） ---
+let participantID = 1;  // 参加者ID
+let conditionID = 1;  // 条件番号・条件名
+let conditionName = "Baseline";  // 条件名
+let startTime = 0;  // 計測開始時間
+let scrollMyX = window.scrollX;  // 自分自身（参加者側）のスクロール位置（X座標）
+let moveWidths: number[] = [];  // ビデオウィンドウの大きさの移動平均を計算するためのリスト
+let moveBorderAlphas: number[] = [];  // ビデオウィンドウの枠の色の透明度の移動平均を計算するためのリスト
+let isSpeaking = false;  // 発話状態か否か
+let borderAlphaValueBasedVoice = AppConstants.BORDER_ALPHA_MIN;  // 発話タイミングに基づく，枠の色の透明度変化を表す値
 
-// ベクトル（数値型リスト）のリストの平均ベクトルを求める関数
-// function Average_vector(number_list: number[][], start_id: number = 0, end_id: number = number_list.length - 1) {
-//   let sum = [0,0];  // 引数のリスト内の要素の合計値
-//   for (let i = start_id; i < end_id + 1; i++) {
-//     sum[0] += number_list[i][0];
-//     sum[1] += number_list[i][1];
-//   }
-//   return [sum[0] / (end_id - start_id + 1), sum[1] / (end_id - start_id + 1)];
-// }
-
-// 2つのベクトル（数値型リスト）の内積を求める関数
-function Inner(number_list1: number[], number_list2: number[]) {
-  return number_list1[0] * number_list2[0] + number_list1[1] * number_list2[1];
-}
-
-// ベクトル（数値型リスト）の長さを求める関数
-function Norm(number_list: number[]) {
-  return Math.sqrt(number_list[0] * number_list[0] + number_list[1] * number_list[1]);
-}
-
-// 参加者の視線方向を識別する関数
-function getParticipantDirection(theta: number) {
-  if (theta < 0 || theta > 360) return "Error";
-
-  // 参加者の視線方向を識別（ここで，相手の向いている向きを自分自身側のディスプレイに反映させるために，LeftとRightが逆になっている（242行目の以下の行）ので，注意）
-  // 「let left_diff_value = distance_rate_move * Norm(fc_d_from_fc_vector) * Math.cos(rad_head_direction - Math.PI);」
-  if (theta < 22.5 || theta >= 337.5) return "Left";
-  else if (theta >= 22.5 && theta < 67.5) return "LeftDown";
-  else if (theta >= 67.5 && theta < 112.5) return "Down";
-  else if (theta >= 112.5 && theta < 157.5) return "RightDown";
-  else if (theta >= 157.5 && theta < 202.5) return "Right";
-  else if (theta >= 202.5 && theta < 247.5) return "RightUp";
-  else if (theta >= 247.5 && theta < 292.5) return "Up";
-  else if (theta >= 292.5 && theta < 337.5) return "LeftUp";
-  else return "Error";
-}
-
-// 移動平均計算時のフレーム数
-const MovingAverage_frame = 10;
-// 移動平均計算用の配列
-let move_top_diffs: number[] = [];
-let move_left_diffs: number[] = [];
-let move_width: number[] = [];
-let move_border_a: number[] = [];
-
-// スクリーンの幅・高さ（参加者側）
-// let screenMyWidth = window.innerWidth;
-// let screenMyHeight = window.innerHeight;
-let screenMyWidth = window.screen.width;
-let screenMyHeight = window.screen.height;
-// ブラウザウィンドウの左上の位置を取得（参加者側）
-let scrollMyX = window.scrollX;
-let scrollMyY = window.scrollY;
-
-// ビデオウィンドウの大きさの最小値・最大値（最小値：スクリーンの幅の70%・最大値：1000（SkyWayの通信でのウィンドウサイズの最大値））
-const width_max = 1000;
-const width_min = width_max * 0.8;
-// 移動量の拡大率
-const distance_rate_move = 10000;
-
-// ビデオウィンドウの大きさのデフォルト値（参加者・対話相手共通）
-const default_width = (width_min + width_max) / 2;
-
-// 位置の移動を行う場合の，スクリーンの中心からのずれ
-const default_top_diff = 0;
-const default_left_diff = 0;
-
-// ビデオウィンドウの枠の色の値（緑色）
-const default_border_r_green = 83;
-const default_border_g_green = 253;
-const default_border_b_green = 49;
-const default_border_a_green = 0;
-
-// ビデオウィンドウの枠の色の値（黒色）
-const default_border_r_black = 0;
-const default_border_g_black = 0;
-const default_border_b_black = 0;
-const default_border_a_black = 0;
-
-// ビデオウィンドウの枠の色の値（赤色）
-const default_border_r_red = 255;
-const default_border_g_red = 0;
-const default_border_b_red = 0;
-const default_border_a_red = 0;
-
-// ビデオウィンドウの枠の色の値（実際に用いる色）
-const default_border_r = default_border_r_green;
-const default_border_g = default_border_g_green;
-const default_border_b = default_border_b_green;
-const default_border_a = default_border_a_green;
-
-// ビデオウィンドウの枠の色の最小値・最大値
-const border_a_min = 0;
-const border_a_max = 1;
-
-// ビデオウィンドウの枠の色を完全に透明にする時の閾値
-const border_a_min_threshold = 0.015;
-
-// ビデオウィンドウの大きさの一次保存（大きさを変更しない条件でも分析できるようにするため）
-let myWindowWidth_tmp_value = 0;
-
-// 自分自身のビデオウィンドウの大きさのデフォルト値
-const myShowedWindowWidth = 250;
-
-// 発話タイミングに基づく，枠の色の透明度変化を表す値
-let border_a_value_based_voice = border_a_min;
-
-// ビデオウィンドウのInfoの更新+音声データの追加
-function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_vector: number[], rad_head_direction: number, theta_head_direction: number, status: boolean, text: string) {
-  // ウィンドウの大きさの最大値に対する，実際のウィンドウの大きさの比率
-  let next_width_rate = 0;
-  // ビデオウィンドウの枠の色の透明度の比率
-  let next_border_a_rate = 0;
-  // 顔の中心点を原点とした時の，正面を向いた際の顔の中心点のベクトルの長さによって，ウィンドウの大きさ・ビデオウィンドウの枠の色の透明度を変更
-  if (150 * Norm(fc_d_from_fc_vector) <= 1) {
-    next_width_rate = 1;
-    next_border_a_rate = 1;
-  }
-  else {
-    next_width_rate = 1 / (150 * Norm(fc_d_from_fc_vector));
-    next_border_a_rate = 1 / (150 * Norm(fc_d_from_fc_vector));
-  }
-
-  // ウィンドウの大きさを踏まえて，ウィンドウの位置を決めるため，ウィンドウの大きさ → ウィンドウの位置の順に算出する
-  // 1. ウィンドウの大きさの算出
-  let width_value = width_max * next_width_rate;
-
-  // ビデオウィンドウの枠の色の透明度の変更
-  let border_a_value = border_a_max * next_border_a_rate;
-
-  // 最小値の考慮（ビデオウィンドウの大きさ・ビデオウィンドウの枠の色の透明度）
-  if (width_value < width_min) width_value = width_min;
-  if (border_a_value < border_a_min_threshold) border_a_value = border_a_min;
-
-  // CSVファイルへの保存用
-  // ビデオウィンドウの大きさの一次保存（大きさを変更しない条件でも分析できるようにするため）
-  myWindowWidth_tmp_value = width_value;
-
-  // 移動平均を導入するために，値を保存（ビデオウィンドウの大きさ・ビデオウィンドウの枠の色の透明度）
-  move_width.push(width_value);
-  move_border_a.push(border_a_value);
-
-  // 移動平均の計算 + リストの肥大化の防止（ビデオウィンドウの大きさ）
-  if (move_width.length < MovingAverage_frame) width_value = Average_value(move_width, 0, move_width.length - 1);
-  else{
-    if (move_width.length > MovingAverage_frame + 3) move_width.shift();
-    width_value = Average_value(move_width, move_width.length - MovingAverage_frame, move_width.length - 1);
-  }
-
-  // 移動平均の計算 + リストの肥大化の防止（ビデオウィンドウの大きさ）
-  if (move_border_a.length < MovingAverage_frame) border_a_value = Average_value(move_border_a, 0, move_border_a.length - 1);
-  else{
-    if (move_border_a.length > MovingAverage_frame + 3) move_border_a.shift();
-    border_a_value = Average_value(move_border_a, move_border_a.length - MovingAverage_frame, move_border_a.length - 1);
-  }
-
-  // ビデオウィンドウの離散変化のための，ウィンドウの大きさの保存（ビデオウィンドウの大きさ）
-  let width_value_discrete = width_min;
-  if (width_value > width_max - (width_max - width_min) * 0.1) {
-    width_value_discrete = width_max;  // 最大サイズ
-  }
-  else width_value_discrete = width_min;  // 最小サイズ
-
-  // 参加者の状態（注視状態 or 視線回避状態）
-  let status_gaze = "";
-  
-  // ビデオウィンドウの大きさが最大値の10%以内の時には，注視状態であると判断する
-  if (myWindowWidth_tmp_value > width_max - (width_max - width_min) * 0.1) {
-    status_gaze = "mutual gaze";
-  }
-  // ビデオウィンドウの大きさが最小値の10%以内の時には，視線回避状態であると判断する
-  if (myWindowWidth_tmp_value < width_min + (width_max - width_min) * 0.1) {
-    status_gaze = "gaze aversion";
-  }
-
-  // BaseLine条件・PositionChange・FrameChange条件の時には，top・leftの値にwidth_valueの値が影響を与えないようにするために，width_valueの値を更新
-  if (conditionID === 1 || conditionID === 2 || conditionID === 5) width_value = default_width;
-
-  // 2. ビデオウィンドウのスクリーン中心からのずれの算出
-  let top_diff_value = distance_rate_move * Norm(fc_d_from_fc_vector) * Math.sin(rad_head_direction);
-  let left_diff_value = distance_rate_move * Norm(fc_d_from_fc_vector) * Math.cos(rad_head_direction - Math.PI);
-
-  // 移動平均を導入するために，値を保存（ビデオウィンドウのスクリーン中心からのずれ）
-  // move_top_diffs.push(top_diff_value);
-  // move_left_diffs.push(left_diff_value);
-
-  // // 移動平均の計算 + リストの肥大化の防止（ビデオウィンドウのスクリーン中心からのずれ）
-  // if (move_top_diffs.length < MovingAverage_frame) top_diff_value = Average_value(move_top_diffs, 0, move_top_diffs.length - 1);
-  // else{
-  //   if (move_top_diffs.length > MovingAverage_frame + 10) move_top_diffs.shift();
-  //   top_diff_value = Average_value(move_top_diffs, move_top_diffs.length - MovingAverage_frame, move_top_diffs.length - 1);
-  // }
-  // if (move_left_diffs.length < MovingAverage_frame) left_diff_value = Average_value(move_left_diffs, 0, move_left_diffs.length - 1);
-  // else{
-  //   if (move_left_diffs.length > MovingAverage_frame + 10) move_left_diffs.shift();
-  //   left_diff_value = Average_value(move_left_diffs, move_left_diffs.length - MovingAverage_frame, move_left_diffs.length - 1);
-  // }
-
-  let newInfo: WindowAndAudioAndParticipantsInfo;
-
-  switch(conditionID) {
-    case 1:  // Baseline条件
-      newInfo = {
-        top_diff: default_top_diff,
-        left_diff: default_left_diff,
-        width: default_width,
-        height: default_width,
-        border_r: default_border_r,
-        border_g: default_border_g,
-        border_b: default_border_b,
-        border_a: border_a_value_based_voice,  // 発話タイミングに基づく枠の色の透明度変化
-        width_inCaseOf_change: myWindowWidth_tmp_value,
-        // top_diff_inCaseOf_change: top_diff_value,
-        // left_diff_inCaseOf_change: left_diff_value,
-        theta: theta_head_direction,
-        status: status,
-        text: text,
-        status_gaze: status_gaze
-      };
-      break;
-    case 2:  // FrameChange条件
-      newInfo = {
-        top_diff: default_top_diff,
-        left_diff: default_left_diff,
-        width: default_width,
-        height: default_width,
-        border_r: default_border_r,
-        border_g: default_border_g,
-        border_b: default_border_b,
-        border_a: border_a_value,
-        width_inCaseOf_change: myWindowWidth_tmp_value,
-        // top_diff_inCaseOf_change: top_diff_value,
-        // left_diff_inCaseOf_change: left_diff_value,
-        theta: theta_head_direction,
-        status: status,
-        text: text,
-        status_gaze: status_gaze
-      }
-      break;
-    case 3:  // SizeChange条件
-      newInfo = {
-        top_diff: default_top_diff,
-        left_diff: default_left_diff,
-        width: width_value,
-        height: width_value,
-        border_r: default_border_r,
-        border_g: default_border_g,
-        border_b: default_border_b,
-        border_a: border_a_value_based_voice,  // 発話タイミングに基づく枠の色の透明度変化
-        width_inCaseOf_change: myWindowWidth_tmp_value,
-        // top_diff_inCaseOf_change: top_diff_value,
-        // left_diff_inCaseOf_change: left_diff_value,
-        theta: theta_head_direction,
-        status: status,
-        text: text,
-        status_gaze: status_gaze
-      };
-      break;
-    case 4:  // SizeChange_Discrete条件
-      newInfo = {
-        top_diff: default_top_diff,
-        left_diff: default_left_diff,
-        width: width_value_discrete,
-        height: width_value_discrete,
-        border_r: default_border_r,
-        border_g: default_border_g,
-        border_b: default_border_b,
-        border_a: border_a_value_based_voice,  // 発話タイミングに基づく枠の色の透明度変化
-        width_inCaseOf_change: myWindowWidth_tmp_value,
-        // top_diff_inCaseOf_change: top_diff_value,
-        // left_diff_inCaseOf_change: left_diff_value,
-        theta: theta_head_direction,
-        status: status,
-        text: text,
-        status_gaze: status_gaze
-      };
-      break;
-    case 5:  // PositionChange条件
-      newInfo = {
-        top_diff: top_diff_value,
-        left_diff: left_diff_value,
-        width: default_width,
-        height: default_width,
-        border_r: default_border_r,
-        border_g: default_border_g,
-        border_b: default_border_b,
-        border_a: border_a_value_based_voice,  // 発話タイミングに基づく枠の色の透明度変化
-        width_inCaseOf_change: myWindowWidth_tmp_value,
-        // top_diff_inCaseOf_change: top_diff_value,
-        // left_diff_inCaseOf_change: left_diff_value,
-        theta: theta_head_direction,
-        status: status,
-        text: text,
-        status_gaze: status_gaze
-      };
-      break;
-    case 6:  // PositionAndSizeChange条件
-      newInfo = {
-        top_diff: top_diff_value,
-        left_diff: left_diff_value,
-        width: width_value,
-        height: width_value,
-        border_r: default_border_r,
-        border_g: default_border_g,
-        border_b: default_border_b,
-        border_a: border_a_value_based_voice,  // 発話タイミングに基づく枠の色の透明度変化
-        width_inCaseOf_change: myWindowWidth_tmp_value,
-        // top_diff_inCaseOf_change: top_diff_value,
-        // left_diff_inCaseOf_change: left_diff_value,
-        theta: theta_head_direction,
-        status: status,
-        text: text,
-        status_gaze: status_gaze
-      };
-      break;
-    default:  // Baseline条件
-      newInfo = {
-        top_diff: default_top_diff,
-        left_diff: default_left_diff,
-        width: default_width,
-        height: default_width,
-        border_r: default_border_r,
-        border_g: default_border_g,
-        border_b: default_border_b,
-        border_a: border_a_value_based_voice,  // 発話タイミングに基づく枠の色の透明度変化
-        width_inCaseOf_change: myWindowWidth_tmp_value,
-        // top_diff_inCaseOf_change: top_diff_value,
-        // left_diff_inCaseOf_change: left_diff_value,
-        theta: theta_head_direction,
-        status: status,
-        text: text,
-        status_gaze: status_gaze
-      };
-      break;
-  }
-
-  return newInfo;
-}
-
+// --- Component Logic ---
 export const MainContent = () => {
-  // 自分自身の参加者情報
-  const [ me, setMe ] = useState<LocalP2PRoomMember>();
+  // --- States ---
+  const [ me, setMe ] = useState<LocalP2PRoomMember>();  // 自分自身の参加者情報
+  const [ roomName, setRoomName ] = useState("");  // ルーム名
+  const [ localStream, setLocalStream ] = useState<{
+    audio: LocalAudioStream;
+    video: LocalVideoStream;
+  }>();  // ローカルストリーム
+  const [ localDataStream, setLocalDataStream ] = useState<LocalDataStream>();  // ローカル側のデータストリーム
+  const [ otherUserDataStream, setOtherUserDataStream ] = useState<RemoteDataStream>();  // リモート側のデータストリーム
+  const [ otherUserPublications, setOtherUserPublications ] = useState<RoomPublication<LocalStream>[]>([]);  // 会話相手の公開ストリーム
+  const [ devices, setDevices ] = React.useState<MediaDeviceInfo[]>([]);  // 
+  const [ myWindowAndAudioAndParticipantsInfo, setMyWindowAndAudioAndParticipantsInfo ] = useState<WindowAndAudioAndParticipantsInfo>({ 
+    topDiff: AppConstants.DEFAULT_TOP_DIFF, leftDiff: AppConstants.DEFAULT_LEFT_DIFF, 
+    width: defaultWidth, height: defaultWidth,
+    borderRed: defaultBorderColor.r, borderGreen: defaultBorderColor.g, borderBlue: defaultBorderColor.b, 
+    borderAlpha: defaultBorderColor.a, borderAlphaValueBasedVoice: borderAlphaValueBasedVoice,
+    widthInCaseOfChange: 0, theta: 0, isSpeaking: false, transcript: "", gazeStatus: ""
+  });  // 自分自身のウィンドウの情報
+  const [ otherUserWindowAndAudioAndParticipantsInfo, setOtherUserWindowAndAudioAndParticipantsInfo ] = useState<WindowAndAudioAndParticipantsInfo>({
+    topDiff: AppConstants.DEFAULT_TOP_DIFF, leftDiff: AppConstants.DEFAULT_LEFT_DIFF, 
+    width: defaultWidth, height: defaultWidth,
+    borderRed: defaultBorderColor.r, borderGreen: defaultBorderColor.g, borderBlue: defaultBorderColor.b, 
+    borderAlpha: defaultBorderColor.a, borderAlphaValueBasedVoice: borderAlphaValueBasedVoice,
+    widthInCaseOfChange: 0, theta: 0, isSpeaking: false, transcript: "", gazeStatus: ""
+  });  // 会話相手のウィンドウの情報
+  const { 
+    transcript,
+    resetTranscript,
+    browserSupportsSpeechRecognition
+  } = useSpeechRecognition();  // 音声認識設定
+  const [ headDirectionResults, setHeadDirectionResults ] = useState<CSV_HeadDirection_Info[]>([]);
+  const [ startTime_HeadDirection, setStartTime_HeadDirection ] = useState<number>(0);  // ウィンドウ情報収集開始時間
+  const [ nowTest, setNowTest ] = useState<boolean>(false);  // ウィンドウ情報収集中か否か
 
-  const appId = useMemo(() => process.env.REACT_APP_SKYWAY_APP_ID, []);
-  const secretKey = useMemo(() => process.env.REACT_APP_SKYWAY_SECRET_KEY, []);
+  // --- Refs ---
+  const localVideo = useRef<HTMLVideoElement>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserNodeRef = useRef<AnalyserNode | null>(null);
+  const dataArrayRef = useRef<Uint8Array | null>(null);
+  const audtioInputGainNodeRef = useRef<GainNode | null>(null);  // オプション: マイク入力のゲイン調整用
+  const webcamRef = useRef<Webcam>(null);  // Webcamの参照
+  const resultsRef = useRef<Results>();  // MediaPipeの検出結果を格納するための参照
+  const CSV_Ref = useRef<CSVLink & HTMLAnchorElement & { link: HTMLAnchorElement }>(null);  // CSVファイルのリンクを格納するための参照
 
+  // --- Memos ---
+  const appId = useMemo(() => process.env.REACT_APP_SKYWAY_APP_ID, []);  // SkyWayのアプリID
+  const secretKey = useMemo(() => process.env.REACT_APP_SKYWAY_SECRET_KEY, []);  // SkyWayのシークレットキー
   const token = useMemo(() => {
     if (appId == null || secretKey == null) return undefined;
 
@@ -458,104 +213,112 @@ export const MainContent = () => {
         },
       },
     }).encode(secretKey);
-  }, [appId, secretKey]);
+  }, [appId, secretKey]);  // SkyWayの認証トークン
+  const myWindowAndAudioContainerStyle = useMemo<React.CSSProperties>(() => ({
+    position: "absolute",
+    top: 0,
+    left: 0,  // 右上の場合：0（右下の場合：window.innerWidth - AppConstants.DEFAULT_MY_WINDOW_WIDTH - 20）
+    width: AppConstants.DEFAULT_MY_WINDOW_WIDTH,
+    border: `10px solid rgba(${myWindowAndAudioAndParticipantsInfo.borderRed}, ${myWindowAndAudioAndParticipantsInfo.borderGreen}, ${myWindowAndAudioAndParticipantsInfo.borderBlue}, ${myWindowAndAudioAndParticipantsInfo.borderAlphaValueBasedVoice})`,
+  }), [ myWindowAndAudioAndParticipantsInfo ]);  // 参加者側のビデオウィンドウのスタイル
+  const otherUserWindowAndAudioContainerStyle = useMemo<React.CSSProperties>(() => ({
+    position: "absolute",
+    top: // 画面の上側にはみ出る場合には，画面上端に位置調整
+         0 + window.screen.height / 2 - otherUserWindowAndAudioAndParticipantsInfo.height / 2 + otherUserWindowAndAudioAndParticipantsInfo.topDiff < 0 ? 0 :
+         // 画面の下側にはみ出る場合には，画面下端に位置調整
+         0 + window.screen.height / 2 - otherUserWindowAndAudioAndParticipantsInfo.height / 2 + otherUserWindowAndAudioAndParticipantsInfo.topDiff 
+         > 0 + window.screen.height - otherUserWindowAndAudioAndParticipantsInfo.height ? 0 + window.screen.height - otherUserWindowAndAudioAndParticipantsInfo.height :
+         // 画面内に収まるなら，その位置に配置
+         0 + window.screen.height / 2 - otherUserWindowAndAudioAndParticipantsInfo.height / 2 + otherUserWindowAndAudioAndParticipantsInfo.topDiff,
+    left: // 画面の左側にはみ出る場合には，画面左端に位置調整
+          window.screenLeft + scrollMyX + window.screen.width / 2 - otherUserWindowAndAudioAndParticipantsInfo.width / 2 + otherUserWindowAndAudioAndParticipantsInfo.leftDiff < 0 ? 0 :
+          window.screenLeft + scrollMyX + window.screen.width / 2 - otherUserWindowAndAudioAndParticipantsInfo.width / 2 + otherUserWindowAndAudioAndParticipantsInfo.leftDiff
+          > window.screenLeft + scrollMyX + window.screen.width - otherUserWindowAndAudioAndParticipantsInfo.width ? window.screenLeft + scrollMyX + window.screen.width - otherUserWindowAndAudioAndParticipantsInfo.width : 
+          window.screenLeft + scrollMyX + window.screen.width / 2 - otherUserWindowAndAudioAndParticipantsInfo.width / 2 + otherUserWindowAndAudioAndParticipantsInfo.leftDiff,
+    width: otherUserWindowAndAudioAndParticipantsInfo.width,
+    border: `10px solid rgba(${otherUserWindowAndAudioAndParticipantsInfo.borderRed}, ${otherUserWindowAndAudioAndParticipantsInfo.borderGreen}, ${otherUserWindowAndAudioAndParticipantsInfo.borderBlue}, ${otherUserWindowAndAudioAndParticipantsInfo.borderAlpha})`
+  }), [ otherUserWindowAndAudioAndParticipantsInfo ]);  // 会話相手側のビデオウィンドウのスタイル
+  const canJoin = useMemo(() => {
+    return (
+      participantID !== -1 && 
+      conditionID !== -1 && 
+      roomName !== "" && 
+      localStream != null && 
+      me == null
+    );
+  }, [ participantID, conditionID, roomName, localStream, me ]);  // ルームに入ることができるか否か
 
-  const localVideo = useRef<HTMLVideoElement>(null);
-
-  // ローカルストリームをここに保持する
-  const [localStream, setLocalStream] = useState<{
-    audio: LocalAudioStream;
-    video: LocalVideoStream;
-  }>();
-  const [ localDataStream, setLocalDataStream ] = useState<LocalDataStream>();
-  const [ otherUserDataStream, setOtherUserDataStream ] = useState<RemoteDataStream>();  // me.subscribe(publication.id) の戻り値に含まれる stream (contentType === "data" のもの)
-
-  const [devices, setDevices] = React.useState<MediaDeviceInfo[]>([]);
-
-  // 発話状態を管理するステート
-  const [ isSpeaking, setIsSpeaking ] = useState<boolean>(false);
-  // AudioContextとAnalyserNodeの参照
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserNodeRef = useRef<AnalyserNode | null>(null);
-  const dataArrayRef = useRef<Uint8Array | null>(null);
-  const audtioInputGainNodeRef = useRef<GainNode | null>(null);  // オプション: マイク入力のゲイン調整用
-
-  // ビデオの初期設定（tokenとvideo要素の参照ができたら実行）
-  useEffect(() => {
-    const initialize = async () => {
-      if (token == null || localVideo.current == null) return;
-
-      // カメラの種類の選択
-      navigator.mediaDevices.getUserMedia({
-        video: {frameRate: 30}
-      }).then((stream) => {
-        // eslint-disable-next-line
-        console.log(stream);  // デバッグ用
-      }
-      ).catch(console.error);
-      const devices_tmp = (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.label.includes("USB Camera"));
-      // eslint-disable-next-line
-      console.log(devices_tmp);
-      setDevices(devices_tmp);
-
-      if(localStream == null) {
-        const stream = 
-          await SkyWayStreamFactory.createMicrophoneAudioAndCameraStream();
-      // const stream = 
-      //  await SkyWayStreamFactory.createMicrophoneAudioAndCameraStream({video: {deviceId: devices_tmp[0].deviceId}});
-        stream.video.attach(localVideo.current);
-        setLocalStream(stream);
-        // eslint-disable-next-line
-        // console.log(stream);  // デバッグ用
-
-        // AudtioContextとAnalyserNodeの初期化
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-
-        // LocalAudioStream.trackから新しいMediaStreamを作成
-        const audioMediaStream = new MediaStream([stream.audio.track]);
-
-        const source = audioContextRef.current.createMediaStreamSource(audioMediaStream);
-        analyserNodeRef.current = audioContextRef.current.createAnalyser();
-        analyserNodeRef.current.fftSize = 2048;  // 音声データを分析するサンプル数
-        dataArrayRef.current = new Uint8Array(analyserNodeRef.current.frequencyBinCount);
-
-        // オプション：ゲインノードを追加して，マイク入力レベルを調整できるようにする
-        audtioInputGainNodeRef.current = audioContextRef.current.createGain();
-        audtioInputGainNodeRef.current.gain.value = 1.0;  // デフォルトゲイン
-
-        source.connect(audtioInputGainNodeRef.current);
-        audtioInputGainNodeRef.current.connect(analyserNodeRef.current);
-
-        // 音声レベル監視を開始
-        startAudioLevelMonitoring();
-      }
-
-      const dataStream = await SkyWayStreamFactory.createDataStream();
-
-      await localVideo.current.play();
-      setLocalDataStream(dataStream);
-    };
-
-    initialize();
-    // eslint-disable-next-line
-    // console.log("初期化されました！");  // デバッグ用
-
-    return () => {
-      // コンポーネントのアンマウント時にAudioContextを閉じる
-      if (audioContextRef.current) {
-        audioContextRef.current.close();
-      }
+  // --- Callbacks ---
+  const onJoinClick = useCallback(async () => {
+    // canJoinまでにチェックされるので，普通は起きない
+    // assertionメソッドにしてもいい
+    if (localStream == null || token == null) {
+      console.error("ローカルストリームまたはトークンが設定されていません。");
+      return;
     }
-  }, [token, localVideo]);
 
-  // 音声レベル監視ロジック
+    try {
+      // ルームを取得、または新規作成
+      const context = await SkyWayContext.Create(token);
+      const room = await SkyWayRoom.FindOrCreate(context, {
+        type: 'p2p',
+        name: roomName,
+      });
+      const me = await room.join();
+      setMe(me);
+
+      // 映像と音声を配信
+      await me.publish(localStream.video);
+      await me.publish(localStream.audio);
+      if (localDataStream !== undefined) {
+        // eslint-disable-next-line
+        console.log("published data stream");  // デバッグ用
+        await me.publish(localDataStream);
+      }
+
+      // 自分以外の参加者情報を取得
+      const otherPublifications = room.publications.filter(p => p.publisher.id !== me.id);
+      setOtherUserPublications(otherPublifications);
+      for (let i = 0; i < otherPublifications.length; i++) {
+        if (otherPublifications[i].contentType === "data") {
+          const { stream } = await me.subscribe(otherPublifications[i].id);
+          if (stream.contentType === "data") {
+            setOtherUserDataStream(stream);
+          }
+        }
+      }
+
+      // その後に参加してきた人の情報を取得
+      room.onStreamPublished.add(async (e) => {
+        if (e.publication.publisher.id !== me.id) {
+          setOtherUserPublications(pre => [ ...pre, e.publication ]);
+        }
+
+        if (e.publication.contentType === "data" && e.publication.publisher.id !== me.id) {
+          const { stream } = await me.subscribe(e.publication.id);
+          if (stream.contentType === "data") {
+            setOtherUserDataStream(stream);
+            // eslint-disable-next-line
+            console.log("DataStreamにセットしました！");  // デバッグ用
+          }  // ここは必ずRemoteDataStreamになるはず
+        }
+      });
+
+      // 部屋名のみを表示させる
+      document.getElementById("active-after-conference")?.classList.remove("non-active");
+      document.getElementById("active-before-conference")?.classList.add("non-active");
+
+    } catch (error) {
+      // エラー処理
+      console.error("ルームへの参加に失敗しました:", error);
+    }
+
+  }, [ roomName, token, localStream, localDataStream ]);  // オンライン会議を立ち上げ
   const startAudioLevelMonitoring = useCallback(() => {
     const analyser = analyserNodeRef.current;
     const dataArray = dataArrayRef.current;
     if (!analyser || !dataArray) return;
 
-    const volumeThreshold = 10;  // 発話と判定するボリュームの閾値（0-255，要調整）
-    const speakingDebounceMs = 200;  // 発話開始/終了の判定を安定させるためのデバウンス時間
     let speakingTimer: NodeJS.Timeout | null = null;
     let notSpeakingTimer: NodeJS.Timeout | null = null;
 
@@ -565,52 +328,48 @@ export const MainContent = () => {
       for (let i = 0; i < dataArray.length; i++) {
         sum += dataArray[i];
       }
-      const averageVolume = sum / dataArray.length;
+      
+      const averageVolume = sum / dataArray.length;  // 音量平均
 
-      // eslint-disable-next-line
-      // console.log("平均音量:", averageVolume);  // デバッグ用
-
-      if (averageVolume > volumeThreshold) {
+      if (averageVolume > AppConstants.VOLUME_THRESHOLD) {
         // eslint-disable-next-line
         console.log("isSpeaking（発話開始）: ", isSpeaking);  // デバッグ用
         // ボリュームが閾値を超えた場合
-          if (speakingTimer === null) {
-            speakingTimer = setTimeout(() => {
-              setIsSpeaking(true);
-              // 発話開始のロジック
-              border_a_value_based_voice = border_a_max;  // 枠の色をつける
-              // 発話開始時に音声認識を開始
-              SpeechRecognition.startListening({
-                continuous: false, // 連続認識を有効にする
-                language: 'ja'
-              });
-              speakingTimer = null;
-            }, speakingDebounceMs);
-          }
-          if (notSpeakingTimer) {
-            clearTimeout(notSpeakingTimer);
-            notSpeakingTimer = null;
-          }
+        if (speakingTimer === null) {
+          speakingTimer = setTimeout(() => {
+            // 発話開始のロジック
+            isSpeaking = true;
+            borderAlphaValueBasedVoice = AppConstants.BORDER_ALPHA_MAX;  // 枠の色をつける
+            SpeechRecognition.startListening({
+              continuous: false, // 連続認識を無効にする
+              language: 'ja'
+            });
+            speakingTimer = null;
+          }, AppConstants.SPEAKING_DEBOUNCE_MS);
+        }
+        if (notSpeakingTimer) {
+          clearTimeout(notSpeakingTimer);
+          notSpeakingTimer = null;
+        }
       }
       else {
         // eslint-disable-next-line
         console.log("isSpeaking（発話終了）: ", isSpeaking);  // デバッグ用
         // ボリュームが閾値を下回った場合
-          if (notSpeakingTimer === null) {
-            notSpeakingTimer = setTimeout(() => {
-              setIsSpeaking(false);
-              // 発話終了のロジック
-              border_a_value_based_voice = border_a_min;  // 枠の色を透明にする
-              // 発話終了時に音声認識を停止
-              SpeechRecognition.stopListening();
-              resetTranscript(); // 次の発話のためにトランスクリプトをリセット
-              notSpeakingTimer = null;
-            }, speakingDebounceMs);
-          }
-          if (speakingTimer) {
-            clearTimeout(speakingTimer);
-            speakingTimer = null;
-          }
+        if (notSpeakingTimer === null) {
+          notSpeakingTimer = setTimeout(() => {
+            // 発話終了のロジック
+            isSpeaking = false;
+            borderAlphaValueBasedVoice = AppConstants.BORDER_ALPHA_MIN;  // 枠の色を透明にする
+            SpeechRecognition.stopListening();
+            resetTranscript(); // 次の発話のためにトランスクリプトをリセット
+            notSpeakingTimer = null;
+          }, AppConstants.SPEAKING_DEBOUNCE_MS);
+        }
+        if (speakingTimer) {
+          clearTimeout(speakingTimer);
+          speakingTimer = null;
+        }
       }
 
       // 次のフレームで再度チェック
@@ -618,84 +377,161 @@ export const MainContent = () => {
     };
 
     requestAnimationFrame(checkAudioLevel);
-  }, [isSpeaking]);
+  }, [ isSpeaking ]);  // 音声レベルの監視
+  // ビデオウィンドウのInfoの更新+音声データの追加
+  const updateWindowInfo = useCallback(
+    (
+      conditionID: number, 
+      fc_d_from_fc_vector: number[], rad_head_direction: number, theta_head_direction: number, 
+      borderAlphaValueBasedVoice: number, status: boolean, text: string
+    ): WindowAndAudioAndParticipantsInfo => {
+      //  --- Variables ---
+      let next_width_rate = 0;  // ウィンドウの大きさの最大値に対する，実際のウィンドウの大きさの比率
+      let next_border_a_rate = 0;  // ビデオウィンドウの枠の色の透明度の比率
+      let width_value = defaultWidth;  // ビデオウィンドウの大きさ
+      let border_a_value = AppConstants.BORDER_ALPHA_MIN;  // ビデオウィンドウの枠の色の透明度
+      let myWindowWidthTmpValue = 0;  // ビデオウィンドウの大きさ（保存・分析用）
+      let width_value_discrete = AppConstants.WIDTH_MIN;  // 離散変化時のビデオウィンドウの大きさ
+      let gazeStatus = "";  // 参加者の視線状態（注視状態 or 視線回避状態）
+      let top_diff_value = AppConstants.DISTANCE_RATE_MOVE * Utils.norm(fc_d_from_fc_vector) * Math.sin(rad_head_direction);  // スクリーンの中心からの上下方向のずれ
+      let left_diff_value = AppConstants.DISTANCE_RATE_MOVE * Utils.norm(fc_d_from_fc_vector) * Math.cos(rad_head_direction - Math.PI);  // スクリーンの中心からの左右方向のずれ
+      let newInfo: WindowAndAudioAndParticipantsInfo;  // ビデオウィンドウの情報をまとめたデータ
 
-  // 自分自身のウィンドウの位置・大きさの調整
-  const [ myWindowAndAudioAndParticipantsInfo, setMyWindowAndAudioAndParticipantsInfo ] = useState<WindowAndAudioAndParticipantsInfo>({ 
-    top_diff: default_top_diff, left_diff: default_left_diff, width: default_width, height: default_width, //  * HeightPerWidthRate,
-    border_r: default_border_r, border_g: default_border_g, border_b: default_border_b, border_a: default_border_a, 
-    width_inCaseOf_change: 0, 
-    // top_diff_inCaseOf_change: 0, left_diff_inCaseOf_change: 0, 
-    theta: 0, status: false, text: "", status_gaze: ""
-  });
+      // ウィンドウの大きさ・ビデオウィンドウの枠の色の透明度の計算
+      if (150 * Utils.norm(fc_d_from_fc_vector) <= 1) {
+        next_width_rate = 1;
+        next_border_a_rate = 1;
+      }
+      else {
+        next_width_rate = 1 / (150 * Utils.norm(fc_d_from_fc_vector));
+        next_border_a_rate = 1 / (150 * Utils.norm(fc_d_from_fc_vector));
+      }
+      width_value = AppConstants.WIDTH_MAX * next_width_rate;
+      border_a_value = AppConstants.BORDER_ALPHA_MAX * next_border_a_rate;
 
-  // 参加者側のビデオウィンドウのパラメータ（自分自身のビデオウィンドウを変更する時に利用）
-  // const myWindowAndAudioContainerStyle = useMemo<React.CSSProperties>(() => ({
-  //     position: "absolute",
-  //     top: scrollMyY + screenMyHeight / 2 - myWindowAndAudioAndParticipantsInfo.height / 2 + myWindowAndAudioAndParticipantsInfo.top_diff < 0 ? 0 :
-  //          scrollMyY + screenMyHeight / 2 - myWindowAndAudioAndParticipantsInfo.height / 2 + myWindowAndAudioAndParticipantsInfo.top_diff > screenMyHeight - myWindowAndAudioAndParticipantsInfo.height ? screenMyHeight - myWindowAndAudioAndParticipantsInfo.height : 
-  //          scrollMyY + screenMyHeight / 2 - myWindowAndAudioAndParticipantsInfo.height / 2 + myWindowAndAudioAndParticipantsInfo.top_diff,
-  //     left: scrollMyX + screenMyWidth / 2 - myWindowAndAudioAndParticipantsInfo.width / 2 + myWindowAndAudioAndParticipantsInfo.left_diff < 0 ? 0 :
-  //           scrollMyX + screenMyWidth / 2 - myWindowAndAudioAndParticipantsInfo.width / 2 + myWindowAndAudioAndParticipantsInfo.left_diff > screenMyWidth - myWindowAndAudioAndParticipantsInfo.width ? screenMyWidth - myWindowAndAudioAndParticipantsInfo.width : 
-  //           scrollMyX + screenMyWidth / 2 - myWindowAndAudioAndParticipantsInfo.width / 2 + myWindowAndAudioAndParticipantsInfo.left_diff,
-  //     width: myWindowAndAudioAndParticipantsInfo.width,
-  //     border: `10px solid rgba(${myWindowAndAudioAndParticipantsInfo.border_r}, ${myWindowAndAudioAndParticipantsInfo.border_g}, ${myWindowAndAudioAndParticipantsInfo.border_b}, ${myWindowAndAudioAndParticipantsInfo.border_a})`
-  // }), [ myWindowAndAudioAndParticipantsInfo ]);
+      // ウィンドウの大きさ・ビデオウィンドウの枠の色の透明度が最小値を下回らないようにする
+      if (width_value < AppConstants.WIDTH_MIN) width_value = AppConstants.WIDTH_MIN;
+      if (border_a_value < AppConstants.BORDER_ALPHA_MIN_THRESHOLD) border_a_value = AppConstants.BORDER_ALPHA_MIN;
 
-  // 参加者側のビデオウィンドウのパラメータ（右上）
-  const myWindowAndAudioContainerStyle = useMemo<React.CSSProperties>(() => ({
-    position: "absolute",
-    top: 0,
-    left: 0,  // 右上の場合（右下の場合：window.innerWidth - myShowedWindowWidth - 20）
-    width: myShowedWindowWidth,
-    border: `10px solid rgba(${myWindowAndAudioAndParticipantsInfo.border_r}, ${myWindowAndAudioAndParticipantsInfo.border_g}, ${myWindowAndAudioAndParticipantsInfo.border_b}, ${myWindowAndAudioAndParticipantsInfo.border_a})`,
-  }), [ myWindowAndAudioAndParticipantsInfo ]);
-  
-  // 音声の初期設定
-  const {
-    transcript,
-    listening,
-    resetTranscript,
-    browserSupportsSpeechRecognition
-  } = useSpeechRecognition();
+      myWindowWidthTmpValue = width_value;  // ウィンドウサイズの一時保存（大きさを変更しない条件でも分析できるようにするため）
 
-  // isSpeakingステートに基づいて，setMyWindowAndAudioAndParticipantsInfoを更新
-  useEffect(() => {
-    // eslint-disable-next-line
-    console.log("isSpeakingの値が変化しました！", isSpeaking);  // デバッグ用
-    setMyWindowAndAudioAndParticipantsInfo(pre => {
-      // 既存の頭部方向などの情報はそのままに，statusとtextのみを更新
-      return {
-        ...pre,
-        status: isSpeaking,
-        text: isSpeaking ? transcript : "",
-      };
-    })
-  }, [isSpeaking, transcript]);
+      // 移動平均の計算 + リストの肥大化の防止（ビデオウィンドウの大きさ・ビデオウィンドウの枠の色の透明度）
+      moveWidths.push(width_value);
+      moveBorderAlphas.push(border_a_value);
+      if (moveWidths.length < AppConstants.MOVING_AVERAGE_FRAME) width_value = Utils.averageValue(moveWidths, 0, moveWidths.length - 1);
+      else{
+        if (moveWidths.length > AppConstants.MOVING_AVERAGE_FRAME + 3) moveWidths.shift();
+        width_value = Utils.averageValue(moveWidths, moveWidths.length - AppConstants.MOVING_AVERAGE_FRAME, moveWidths.length - 1);
+      }
+      if (moveBorderAlphas.length < AppConstants.MOVING_AVERAGE_FRAME) border_a_value = Utils.averageValue(moveBorderAlphas, 0, moveBorderAlphas.length - 1);
+      else{
+        if (moveBorderAlphas.length > AppConstants.MOVING_AVERAGE_FRAME + 3) moveBorderAlphas.shift();
+        border_a_value = Utils.averageValue(moveBorderAlphas, moveBorderAlphas.length - AppConstants.MOVING_AVERAGE_FRAME, moveBorderAlphas.length - 1);
+      }
 
-  // myWindowPositionが更新された時の処理
-  useEffect(() => {
-    // eslint-disable-next-line
-    // console.log("自分のデータ送信中...");
-    if (localDataStream != null) {
-      localDataStream.write(myWindowAndAudioAndParticipantsInfo);
-      // eslint-disable-next-line
-      // console.log("自分のデータを送信しました！");  // デバッグ用
-    }
-  }, [ myWindowAndAudioAndParticipantsInfo ]);
+      // 離散変化時のビデオウィンドウの大きさの計算
+      if (width_value > AppConstants.WIDTH_MAX - (AppConstants.WIDTH_MAX - AppConstants.WIDTH_MIN) * 0.1) {
+        width_value_discrete = AppConstants.WIDTH_MAX;  // 最大サイズ
+      }
+      else width_value_discrete = AppConstants.WIDTH_MIN;  // 最小サイズ
 
-  // MediaPipeを用いて，会話相手の頭部方向を取得
-  const webcamRef = useRef<Webcam>(null);
-  const resultsRef = useRef<Results>();
-  // 自分・会話相手の頭部方向のログデータをCSVファイルとして書き出す
-  const CSV_HeadDirection_Ref = useRef<CSVLink & HTMLAnchorElement & { link: HTMLAnchorElement }>(null);
-  const [headDirectionResults, setHeadDirectionResults] = useState<CSV_HeadDirection_Info[]>([]);
+      // 参加者の視線状態（注視状態 or 視線回避状態）の算出
+      if (myWindowWidthTmpValue > AppConstants.WIDTH_MAX - (AppConstants.WIDTH_MAX - AppConstants.WIDTH_MIN) * 0.1) {
+        gazeStatus = "mutual gaze";
+      }  // ビデオウィンドウの大きさが最大値の10%以内の時には，注視状態であると判断する
+      if (myWindowWidthTmpValue < AppConstants.WIDTH_MIN + (AppConstants.WIDTH_MAX - AppConstants.WIDTH_MIN) * 0.1) {
+        gazeStatus = "gaze aversion";
+      }  // ビデオウィンドウの大きさが最小値の10%以内の時には，視線回避状態であると判断する
 
-  /** 検出結果（フレーム毎に呼び出される） */
+      // ビデオウィンドウの情報をまとめたデータの作成
+      const baseInfo = {
+        borderRed: defaultBorderColor.r,
+        borderGreen: defaultBorderColor.g,
+        borderBlue: defaultBorderColor.b,
+        borderAlphaValueBasedVoice: borderAlphaValueBasedVoice,
+        widthInCaseOfChange: myWindowWidthTmpValue,
+        theta: theta_head_direction,
+        isSpeaking: status,
+        transcript: text,
+        gazeStatus: gazeStatus
+      }  // ビデオウィンドウの情報のベースデータ
+
+      switch(conditionID) {
+        case 1:  // Baseline条件
+          newInfo = {
+            ...baseInfo,
+            topDiff: AppConstants.DEFAULT_TOP_DIFF,
+            leftDiff: AppConstants.DEFAULT_LEFT_DIFF,
+            width: defaultWidth,
+            height: defaultWidth,
+            borderAlpha: borderAlphaValueBasedVoice,
+          };
+          break;
+        case 2:  // FrameChange条件
+          newInfo = {
+            ...baseInfo,
+            topDiff: AppConstants.DEFAULT_TOP_DIFF,
+            leftDiff: AppConstants.DEFAULT_LEFT_DIFF,
+            width: defaultWidth,
+            height: defaultWidth,
+            borderAlpha: border_a_value,
+          }
+          break;
+        case 3:  // SizeChange条件
+          newInfo = {
+            ...baseInfo,
+            topDiff: AppConstants.DEFAULT_TOP_DIFF,
+            leftDiff: AppConstants.DEFAULT_LEFT_DIFF,
+            width: width_value,
+            height: width_value,
+            borderAlpha: borderAlphaValueBasedVoice,
+          };
+          break;
+        case 4:  // SizeChange_Discrete条件
+          newInfo = {
+            ...baseInfo,
+            topDiff: AppConstants.DEFAULT_TOP_DIFF,
+            leftDiff: AppConstants.DEFAULT_LEFT_DIFF,
+            width: width_value_discrete,
+            height: width_value_discrete,
+            borderAlpha: borderAlphaValueBasedVoice,
+          };
+          break;
+        case 5:  // PositionChange条件
+          newInfo = {
+            ...baseInfo,
+            topDiff: top_diff_value,
+            leftDiff: left_diff_value,
+            width: defaultWidth,
+            height: defaultWidth,
+            borderAlpha: borderAlphaValueBasedVoice,
+          };
+          break;
+        case 6:  // PositionAndSizeChange条件
+          newInfo = {
+            ...baseInfo,
+            topDiff: top_diff_value,
+            leftDiff: left_diff_value,
+            width: width_value,
+            height: width_value,
+            borderAlpha: borderAlphaValueBasedVoice,
+          };
+          break;
+        default:  // Baseline条件
+          newInfo = {
+            ...baseInfo,
+            topDiff: AppConstants.DEFAULT_TOP_DIFF,
+            leftDiff: AppConstants.DEFAULT_LEFT_DIFF,
+            width: defaultWidth,
+            height: defaultWidth,
+            borderAlpha: borderAlphaValueBasedVoice,
+          };
+      }
+
+      return newInfo;  // ビデオウィンドウの情報を返す
+    }, []
+  );
   const onResults = useCallback((results: Results) => {
-    // eslint-disable-next-line
-    // console.log(results);  // デバッグ用
-
     // 顔の座標が正しく取得できている時のみ実行
     if (results.multiFaceLandmarks.length > 0) {
       // 検出結果の格納
@@ -705,7 +541,6 @@ export const MainContent = () => {
       let landmarks_pos_x: number[] = []  // 468個の点のx座標を格納するリスト
       let landmarks_pos_y: number[] = []  // 468個の点のy座標を格納するリスト
       let face_center_default_pos: number[] = []  // 正面を向いた時の顔の中心点（ここでは，飯塚さんの修論に倣って，鼻の先の座標としている．）
-      // const Start_OnePoint = performance.now();  // 1点の処理の開始時刻（処理時間計測用）
       if (results.multiFaceLandmarks && results.multiFaceLandmarks[0]) {
         for (let id = 0; id < results.multiFaceLandmarks[0].length; id++) {
           // 特定の顔の点を取得（x座標）
@@ -733,210 +568,152 @@ export const MainContent = () => {
         }
       }
       // 顔の中心点の座標
-      const face_center_pos = [Average_value(landmarks_pos_x), Average_value(landmarks_pos_y)];
-      // const End_OnePoint = performance.now();  // 1点の処理の終了時刻（処理時間計測用）
-      // eslint-disable-next-line
-      // console.log("処理時間：" + (End_OnePoint - Start_OnePoint) + "ミリ秒");  // デバッグ用
-      // 頭部方向を計算するためのベクトル
-      const base_vector = [1,0];
-      // 顔の中心点を原点とした時の，正面を向いた際の顔の中心点のベクトル
-      const fc_d_from_fc_vector = [face_center_default_pos[0] - face_center_pos[0], face_center_default_pos[1] - face_center_pos[1]];
-      
-      // 頭部方向（ラジアン）
-      let rad_head_direction = Math.acos(Inner(base_vector, fc_d_from_fc_vector) / (Norm(base_vector) * Norm(fc_d_from_fc_vector)));
-      // 頭部方向（度）
-      let theta_head_direction = rad_head_direction * (180 / Math.PI);
+      const face_center_pos = [ Utils.averageValue(landmarks_pos_x), Utils.averageValue(landmarks_pos_y) ];
+      const base_vector = [1,0];  // 頭部方向を計算するためのベクトル
+      const fc_d_from_fc_vector = [face_center_default_pos[0] - face_center_pos[0], face_center_default_pos[1] - face_center_pos[1]];  // 顔の中心点を原点とした時の，正面を向いた際の顔の中心点のベクトル
+      let rad_head_direction = Math.acos(Utils.inner(base_vector, fc_d_from_fc_vector) / (Utils.norm(base_vector) * Utils.norm(fc_d_from_fc_vector)));  // 頭部方向（ラジアン）
+      let theta_head_direction = rad_head_direction * (180 / Math.PI);  // 頭部方向（度）
       // arccosの値域が0～πであるため，上下の区別をするために，上を向いている時には，ラジアンおよび度の値を更新する
       if (fc_d_from_fc_vector[1] < 0) {
         rad_head_direction = -rad_head_direction;
         theta_head_direction = 360 - theta_head_direction;
       }
 
-      // widthの範囲：800px~1000px
-      // 要検討：ウィンドウの動きとユーザの実際の動きを合わせるために，左右反転させる？
-      setMyWindowAndAudioAndParticipantsInfo(pre => setWindowAndAudioAndParticipantsInfo(conditionID, fc_d_from_fc_vector, rad_head_direction, theta_head_direction, isSpeaking, isSpeaking ? transcript : ""));
+      // 自分自身のビデオウィンドウの情報を更新
+      setMyWindowAndAudioAndParticipantsInfo(pre => 
+        updateWindowInfo(
+          conditionID, 
+          fc_d_from_fc_vector, 
+          rad_head_direction, 
+          theta_head_direction, 
+          borderAlphaValueBasedVoice, 
+          isSpeaking, isSpeaking ? transcript : ""
+        )
+      );
     }
-  },[]);
+  },[]);  // MediaPipeによる顔検出 & 頭部方向の計算  
+  const testStart = useCallback(() => {
+    // 頭部方向の書き出し開始
+    setHeadDirectionResults([
+      { ID: participantID, condition: conditionID, startTime: 0, endTime:0, 
+        myTheta: 0, 
+        myDirection: "", myWindowWidth: 0, myStatusGaze: "",
+        myIsSpeaking: false, myTranscript: "",
+        otherTheta: 0, 
+        otherDirection: "", otherWindowWidth: 0, otherStatusGaze: "",
+        otherIsSpeaking: false, otherTranscript: "" }
+    ]);
+    setStartTime_HeadDirection(0);
+    startTime = performance.now();
+    setNowTest(true);
+  }, []);  // CSVファイルへのウィンドウ情報書き出し開始
+  const testEnd = useCallback(() => {
+    setNowTest(false);
+    CSV_Ref?.current?.link.click();
+  }, []);  // CSVファイルへのウィンドウ情報書き出し終了 & CSV保存
 
-  // 他ユーザの座標情報を保持（これを自分のアイコンと同様に画面表示用のstyleに反映する）
-  const [ otherUserWindowAndAudioAndParticipantsInfo, setOtherUserWindowAndAudioAndParticipantsInfo ] = useState<WindowAndAudioAndParticipantsInfo>({
-    top_diff: default_top_diff, left_diff: default_left_diff, width: default_width, height: default_width, //  * HeightPerWidthRate,
-    border_r: default_border_r, border_g: default_border_g, border_b: default_border_b, border_a: default_border_a, 
-    // top_diff_inCaseOf_change: 0, left_diff_inCaseOf_change: 0, 
-    width_inCaseOf_change: 0, theta: 0, status: false, text: "", status_gaze: ""
-   });
-
-  // 他ユーザのウィンドウの位置・大きさの変更（フィールド領域をはみ出ないように調整を入れる）
-  const otherUserWindowAndAudioContainerStyle = useMemo<React.CSSProperties>(() => ({
-    position: "absolute",
-    top: // window.screenTop + scrollMyY - Text_height - (window.outerHeight - window.innerHeight)  // デフォルト（初期位置）
-         0 + window.screen.height / 2  // スクリーンの高さの半分
-         - otherUserWindowAndAudioAndParticipantsInfo.height / 2 + otherUserWindowAndAudioAndParticipantsInfo.top_diff // ビデオウィンドウが中央に来るように調整
-         < 0 ? 0 :  // 画面上にはみ出ないように調整
-         // window.screenTop + scrollMyY - Text_height - (window.outerHeight - window.innerHeight)  // デフォルト（初期位置）
-         0 + window.screen.height / 2  // スクリーンの高さの半分
-         - otherUserWindowAndAudioAndParticipantsInfo.height / 2 + otherUserWindowAndAudioAndParticipantsInfo.top_diff // ビデオウィンドウが中央に来るように調整
-         > // window.screenTop + scrollMyY - Text_height - (window.outerHeight - window.innerHeight) 
-         0 + window.screen.height - otherUserWindowAndAudioAndParticipantsInfo.height  // 画面下にはみ出ないように調整
-         ? // window.screenTop + scrollMyY - Text_height - (window.outerHeight - window.innerHeight)  // デフォルト（初期位置）
-         0 + window.screen.height - otherUserWindowAndAudioAndParticipantsInfo.height : 
-         // window.screenTop + scrollMyY - Text_height - (window.outerHeight - window.innerHeight) // デフォルト（初期位置）
-         0 + window.screen.height / 2  // スクリーンの高さの半分
-         - otherUserWindowAndAudioAndParticipantsInfo.height / 2 + otherUserWindowAndAudioAndParticipantsInfo.top_diff, // ビデオウィンドウが中央に来るように調整
-    left: window.screenLeft + scrollMyX  // デフォルト（初期位置）
-          + window.screen.width / 2 // ウィンドウの幅の半分
-          - otherUserWindowAndAudioAndParticipantsInfo.width / 2 + otherUserWindowAndAudioAndParticipantsInfo.left_diff // ビデオウィンドウが中央に来るように調整
-          < 0 ? 0 :  // 画面左にはみ出ないように調整
-          window.screenLeft + scrollMyX  // デフォルト（初期位置）
-          + window.screen.width / 2  // ウィンドウの幅の半分 
-          - otherUserWindowAndAudioAndParticipantsInfo.width / 2 + otherUserWindowAndAudioAndParticipantsInfo.left_diff // ビデオウィンドウが中央に来るように調整
-          > window.screenLeft + scrollMyX  // デフォルト（初期位置）
-          + window.screen.width - otherUserWindowAndAudioAndParticipantsInfo.width  // 画面右にはみ出ないように調整
-          ? window.screenLeft + scrollMyX // デフォルト（初期位置）
-          + window.screen.width - otherUserWindowAndAudioAndParticipantsInfo.width : 
-          window.screenLeft + scrollMyX  // デフォルト（初期位置）
-          + window.screen.width / 2 // ウィンドウの幅の半分
-          - otherUserWindowAndAudioAndParticipantsInfo.width / 2 + otherUserWindowAndAudioAndParticipantsInfo.left_diff, // ビデオウィンドウが中央に来るように調整
-    width: otherUserWindowAndAudioAndParticipantsInfo.width,
-    border: `10px solid rgba(${otherUserWindowAndAudioAndParticipantsInfo.border_r}, ${otherUserWindowAndAudioAndParticipantsInfo.border_g}, ${otherUserWindowAndAudioAndParticipantsInfo.border_b}, ${otherUserWindowAndAudioAndParticipantsInfo.border_a})`
-  }), [ otherUserWindowAndAudioAndParticipantsInfo ]);
-
+  // --- Effects ---
   useEffect(() => {
-    // eslint-disable-next-line
-    // console.log("相手のデータ受信設定");
-    if (otherUserDataStream != null) {
-      // callbackで受信座標を反映する
-      otherUserDataStream.onData.add((args) => {
+    const initialize = async () => {
+      if (token == null || localVideo.current == null) return;
+
+      // カメラの種類の選択
+      navigator.mediaDevices.getUserMedia({
+        video: {frameRate: 30}
+      }).then((stream) => {
         // eslint-disable-next-line
-        // console.log(args);  // デバッグ用
+        console.log(stream);  // デバッグ用
+      }
+      ).catch(console.error);
+      // カメラ情報をセット
+      const devices_tmp = (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.label.includes("USB Camera"));
+      setDevices(devices_tmp);
+
+      if(localStream == null) {
+        const stream = await SkyWayStreamFactory.createMicrophoneAudioAndCameraStream();
+        stream.video.attach(localVideo.current);
+        setLocalStream(stream);
+
+        // AudtioContextとAnalyserNodeの初期化
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+
+        // LocalAudioStream.trackから新しいMediaStreamを作成
+        const audioMediaStream = new MediaStream([stream.audio.track]);
+
+        // MediaStreamSourceとAnalyserNodeの作成
+        const source = audioContextRef.current.createMediaStreamSource(audioMediaStream);
+        analyserNodeRef.current = audioContextRef.current.createAnalyser();
+        analyserNodeRef.current.fftSize = 2048;  // 音声データを分析するサンプル数
+        dataArrayRef.current = new Uint8Array(analyserNodeRef.current.frequencyBinCount);
+
+        // オプション：ゲインノードを追加して，マイク入力レベルを調整できるようにする
+        audtioInputGainNodeRef.current = audioContextRef.current.createGain();
+        audtioInputGainNodeRef.current.gain.value = 1.0;  // デフォルトゲイン
+
+        // AudioNodeの接続
+        source.connect(audtioInputGainNodeRef.current);
+        audtioInputGainNodeRef.current.connect(analyserNodeRef.current);
+
+        // 音声レベル監視を開始
+        startAudioLevelMonitoring();
+      }
+
+      const dataStream = await SkyWayStreamFactory.createDataStream();
+
+      await localVideo.current.play();
+      setLocalDataStream(dataStream);
+    };
+    
+    initialize();  // 初期化
+    // eslint-disable-next-line
+    console.log("初期化されました！");  // デバッグ用
+
+    return () => {
+      // コンポーネントのアンマウント時にAudioContextを閉じる
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+      }
+    }
+  }, [ token, localVideo ]);  // ビデオの初期設定（tokenとvideo要素の参照ができたら実行）
+  useEffect(() => {
+    if (!browserSupportsSpeechRecognition) {
+      // eslint-disable-next-line
+      console.error("ブラウザが音声認識をサポートしていません。");  // デバッグ用
+    }
+  }, [ browserSupportsSpeechRecognition ]);  // 音声認識のサポート状況の確認
+  useEffect(() => {
+    if (localDataStream != null) {
+      localDataStream.write(myWindowAndAudioAndParticipantsInfo);
+      // eslint-disable-next-line
+      console.log("自分のデータを送信しました！");  // デバッグ用
+    }
+  }, [ myWindowAndAudioAndParticipantsInfo ]);  // 自分自身のウィンドウ情報の送信
+  useEffect(() => {
+    if (otherUserDataStream != null) {
+      otherUserDataStream.onData.add((args) => {
         setOtherUserWindowAndAudioAndParticipantsInfo(args as WindowAndAudioAndParticipantsInfo);
         // eslint-disable-next-line
-        // console.log("相手のデータを受信しました！");  // デバッグ用
-        // eslint-disable-next-line
-        // console.log(args);  // デバッグ用
+        console.log("相手のデータを受信しました！");  // デバッグ用
       });
     }
-  }, [ otherUserDataStream ]);
-
-  // 計測開始時間の定義
-  const [startTime_HeadDirection, setStartTime_HeadDirection] = useState<number>(0);
-
-  const [nowTest, setNowTest] = useState<boolean>(false);
-
-  // CSVファイルへの頭部方向・音声データの情報のセット
+  }, [ otherUserDataStream ]);  // 会話相手のウィンドウ情報の受信
   useEffect(() => {
-      // eslint-disable-next-line
-      // console.log(nowTest);  // デバッグ用
-      if (otherUserDataStream != null) {
-        if (nowTest) {
-          const nowTime_HeadDirection = (performance.now() - startTime) / 1000;
-          setHeadDirectionResults((prev) => [
-            ...prev,
-            { ID: participantID, condition: conditionID, startTime: startTime_HeadDirection, endTime: nowTime_HeadDirection, myTheta: myWindowAndAudioAndParticipantsInfo.theta, 
-              // myPositionX_diff: myWindowAndAudioAndParticipantsInfo.left_diff_inCaseOf_change, myPositionY_diff: myWindowAndAudioAndParticipantsInfo.top_diff_inCaseOf_change, 
-              myDirection: getParticipantDirection(myWindowAndAudioAndParticipantsInfo.theta), myWindowWidth: myWindowAndAudioAndParticipantsInfo.width_inCaseOf_change, myStatus_gaze: myWindowAndAudioAndParticipantsInfo.status_gaze,
-              // otherPositionX_diff: otherUserWindowAndAudioAndParticipantsInfo.left_diff_inCaseOf_change, otherPositionY_diff: otherUserWindowAndAudioAndParticipantsInfo.top_diff_inCaseOf_change, 
-              otherTheta: otherUserWindowAndAudioAndParticipantsInfo.theta, otherDirection: getParticipantDirection(otherUserWindowAndAudioAndParticipantsInfo.theta), otherWindowWidth: otherUserWindowAndAudioAndParticipantsInfo.width_inCaseOf_change, otherStatus_gaze: otherUserWindowAndAudioAndParticipantsInfo.status_gaze }
-          ]);
-          setStartTime_HeadDirection(nowTime_HeadDirection);
-        }
-      }
-  }, [ otherUserWindowAndAudioAndParticipantsInfo ]);
-
-  const [roomName, setRoomName] = useState("");
-
-  // ルームに入ることができるかの確認
-  const canJoin = useMemo(() => {
-    return participantID !== -1 && conditionID !== -1 && roomName !== "" && localStream != null && me == null;
-  }, [participantID, conditionID, roomName, localStream, me]);
-
-  // Joinボタンをクリックした時に実行する関数
-  const onJoinClick = useCallback(async () => {
-    // canJoinまでにチェックされるので，普通は起きない
-    // assertionメソッドにしてもいい
-    if (localStream == null || token == null) return;
-
-    const context = await SkyWayContext.Create(token);
-
-    // ルームを取得、または新規作成
-    const room = await SkyWayRoom.FindOrCreate(context, {
-      type: 'p2p',
-      name: roomName,
-    });
-
-    const me = await room.join();
-    setMe(me);
-
-    // 映像と音声を配信
-    await me.publish(localStream.video);
-    await me.publish(localStream.audio);
-    if (localDataStream !== undefined) {
-      // eslint-disable-next-line
-      // console.log("published data stream");  // デバッグ用
-      await me.publish(localDataStream);
-    }
-
-    // 自分以外の参加者情報を取得
-    const otherPublifications = room.publications.filter(p => p.publisher.id !== me.id);
-    setOtherUserPublications(otherPublifications);
-    // eslint-disable-next-line
-    // console.log(otherPublifications);  // デバッグ用
-    for (let i = 0; i < otherPublifications.length; i++) {
-      if (otherPublifications[i].contentType === "data") {
-        const { stream } = await me.subscribe(otherPublifications[i].id);
-        if (stream.contentType === "data") {
-          setOtherUserDataStream(stream);
-        }
-      }
-    }
-
-    // その後に参加してきた人の情報を取得
-    room.onStreamPublished.add(async (e) => {
-      if (e.publication.publisher.id !== me.id) {
-        setOtherUserPublications(pre => [ ...pre, e.publication ]);
-      }
-
-      // eslint-disable-next-line
-      // console.log(e);  // デバッグ用
-      if (e.publication.contentType === "data" && e.publication.publisher.id !== me.id) {
-        // eslint-disable-next-line
-        // console.log("DataStreamを購読しました！");  // デバッグ用
-        const { stream } = await me.subscribe(e.publication.id);
-        // ここは必ずRemoteDataStreamになるはず
-        if (stream.contentType === "data") {
-          setOtherUserDataStream(stream);
-          // eslint-disable-next-line
-          // console.log("DataStreamにセットしました！");  // デバッグ用
-        }
-      }
-    });
-
-    // 部屋名のみを表示させる
-    document.getElementById("active-after-conference")?.classList.remove("non-active");
-    document.getElementById("active-before-conference")?.classList.add("non-active");
-
-  }, [roomName, token, localStream, localDataStream]);
-
-  const [ otherUserPublications, setOtherUserPublications ] = useState<RoomPublication<LocalStream>[]>([]);
-
-  useEffect(() => {
+    // MediaPipe側の初期設定
     const faceMesh = new FaceMesh({
       locateFile: file => {
         return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
       }
     });
-
     faceMesh.setOptions({
       maxNumFaces: 1,
       refineLandmarks: true, // landmarks 468 -> 478
       minDetectionConfidence: 0.5,
       minTrackingConfidence: 0.5
     });
-
     faceMesh.onResults(onResults);
 
-    if (localVideo.current) {
-      // console.log(webcamRef.current);
+    // MediaPipeの顔検出用のカメラ検出
+    if (localVideo.current && webcamRef.current?.video) {
       const camera = new Camera(webcamRef.current!.video!, {
         onFrame: async () => {
           await faceMesh.send({ image: webcamRef.current!.video! })
@@ -946,50 +723,31 @@ export const MainContent = () => {
     }
 
     return () => {
-        faceMesh.close();
+      faceMesh.close();
     }
-  }, [onResults]);
-
-  if (!browserSupportsSpeechRecognition) {
-    // eslint-disable-next-line
-    console.error("ブラウザが音声認識をサポートしていません。");  // デバッグ用
-  }
-
-  // CSVファイルに書き出すデータの計測開始・計測終了を制御する関数
-  const testStart = () => {
-    // 頭部方向の書き出し開始
-    setHeadDirectionResults([
-      { ID: participantID, condition: conditionID, startTime: 0, endTime:0, 
-        myTheta: 0, 
-        // myPositionX_diff: 0, myPositionY_diff: 0, 
-        myDirection: "", myWindowWidth: 0, myStatus_gaze: "",
-        otherTheta: 0, 
-        // otherPositionX_diff: 0, otherPositionY_diff: 0, 
-        otherDirection: "", otherWindowWidth: 0, otherStatus_gaze: "" }
-    ]);
-    setStartTime_HeadDirection(0);
-
-    // ログデータの書き出し開始
-    startTime = performance.now();
-    setNowTest(true);
-  }
-
-  // データ計測終了
-  const testEnd = () => {
-
-    const webgazer = (window as any).webgazer;
-    if (webgazer) {
-      webgazer.setGazeListener((data: any, timestamp: number) => {});
-    }
-
-    setNowTest(false);
-    CSV_HeadDirection_Ref?.current?.link.click();
-
-    // CSVファイルに書き出すデータをコンソールにも出してみる
-    // eslint-disable-next-line
-    // console.log(headDirectionResults);  // デバッグ用
-  }
+  }, [ onResults ]);  // MediaPipeの顔検出の準備
+  useEffect(() => {
+      if (otherUserDataStream != null) {
+        if (nowTest) {
+          const nowTime_HeadDirection = (performance.now() - startTime) / 1000;
+          setHeadDirectionResults((prev) => [
+            ...prev,
+            { ID: participantID, condition: conditionID, 
+              startTime: startTime_HeadDirection, endTime: nowTime_HeadDirection, 
+              myTheta: myWindowAndAudioAndParticipantsInfo.theta, myDirection: Utils.getParticipantDirection(myWindowAndAudioAndParticipantsInfo.theta),
+              myWindowWidth: myWindowAndAudioAndParticipantsInfo.widthInCaseOfChange, myStatusGaze: myWindowAndAudioAndParticipantsInfo.gazeStatus,
+              myIsSpeaking: myWindowAndAudioAndParticipantsInfo.isSpeaking, myTranscript: myWindowAndAudioAndParticipantsInfo.transcript,
+              otherTheta: otherUserWindowAndAudioAndParticipantsInfo.theta, otherDirection: Utils.getParticipantDirection(otherUserWindowAndAudioAndParticipantsInfo.theta),
+              otherWindowWidth: otherUserWindowAndAudioAndParticipantsInfo.widthInCaseOfChange, otherStatusGaze: otherUserWindowAndAudioAndParticipantsInfo.gazeStatus,
+              otherIsSpeaking: otherUserWindowAndAudioAndParticipantsInfo.isSpeaking, otherTranscript: otherUserWindowAndAudioAndParticipantsInfo.transcript
+            }
+          ]);
+          setStartTime_HeadDirection(nowTime_HeadDirection);
+        }
+      }
+  }, [ otherUserWindowAndAudioAndParticipantsInfo ]);  // CSVファイルへの頭部方向・音声データの書き出し
   
+  // --- render ---
   return (
     <div>
       <div id="active-before-conference">
@@ -1067,10 +825,10 @@ export const MainContent = () => {
         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
         <button onClick={testEnd} disabled={!nowTest}>Measurement End</button>
       </div>
-      <CSVLink data={headDirectionResults} filename={`C${conditionID}_ID${participantID}_headDirectionResults.csv`} ref={CSV_HeadDirection_Ref} ></CSVLink>
-      <div>
-        {/*<p>トランスクリプト：{transcript}</p>*/}
-      </div>
+      <CSVLink data={headDirectionResults} filename={`C${conditionID}_ID${participantID}_headDirectionResults.csv`} ref={CSV_Ref} ></CSVLink>
+      {/* <div>
+        <p>トランスクリプト：{transcript}</p>
+      </div> */}
         <div className="icon-container">
         {
           me != null && otherUserPublications.map(p => (

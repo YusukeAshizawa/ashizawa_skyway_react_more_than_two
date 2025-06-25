@@ -41,7 +41,3 @@
 #webgazerVideoContainer {
   display: none !important; /* ビデオフィードを完全に非表示 */
 }
-
-#webgazerGazeDot {
-  /* display: none !important; 赤い点を非表示 */
-}
