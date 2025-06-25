@@ -193,10 +193,10 @@ const default_border_b_red = 0;
 const default_border_a_red = 0;
 
 // ビデオウィンドウの枠の色の値（実際に用いる色）
-const default_border_r = default_border_r_red;
-const default_border_g = default_border_g_red;
-const default_border_b = default_border_b_red;
-const default_border_a = default_border_a_red;
+const default_border_r = default_border_r_green;
+const default_border_g = default_border_g_green;
+const default_border_b = default_border_b_green;
+const default_border_a = default_border_a_green;
 
 // ビデオウィンドウの枠の色の最小値・最大値
 const border_a_min = 0;
@@ -210,6 +210,9 @@ let myWindowWidth_tmp_value = 0;
 
 // 自分自身のビデオウィンドウの大きさのデフォルト値
 const myShowedWindowWidth = 250;
+
+// 発話タイミングに基づく，枠の色の透明度変化を表す値
+let border_a_value_based_voice = border_a_min;
 
 // ビデオウィンドウのInfoの更新+音声データの追加
 function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_vector: number[], rad_head_direction: number, theta_head_direction: number, status: boolean, text: string) {
@@ -337,7 +340,8 @@ function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_
         border_r: default_border_r,
         border_g: default_border_g,
         border_b: default_border_b,
-        border_a: default_border_a,
+        // border_a: default_border_a,
+        border_a: border_a_value_based_voice,  // 発話タイミングに基づく枠の色の透明度変化
         width_inCaseOf_change: myWindowWidth_tmp_value,
         // top_diff_inCaseOf_change: top_diff_value,
         // left_diff_inCaseOf_change: left_diff_value,
@@ -375,7 +379,8 @@ function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_
         border_r: default_border_r,
         border_g: default_border_g,
         border_b: default_border_b,
-        border_a: default_border_a,
+        // border_a: default_border_a,
+        border_a: border_a_value_based_voice,  // 発話タイミングに基づく枠の色の透明度変化
         width_inCaseOf_change: myWindowWidth_tmp_value,
         // top_diff_inCaseOf_change: top_diff_value,
         // left_diff_inCaseOf_change: left_diff_value,
@@ -394,7 +399,8 @@ function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_
         border_r: default_border_r,
         border_g: default_border_g,
         border_b: default_border_b,
-        border_a: default_border_a,
+        // border_a: default_border_a,
+        border_a: border_a_value_based_voice,  // 発話タイミングに基づく枠の色の透明度変化
         width_inCaseOf_change: myWindowWidth_tmp_value,
         // top_diff_inCaseOf_change: top_diff_value,
         // left_diff_inCaseOf_change: left_diff_value,
@@ -413,7 +419,8 @@ function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_
         border_r: default_border_r,
         border_g: default_border_g,
         border_b: default_border_b,
-        border_a: default_border_a,
+        // border_a: default_border_a,
+        border_a: border_a_value_based_voice,  // 発話タイミングに基づく枠の色の透明度変化
         width_inCaseOf_change: myWindowWidth_tmp_value,
         // top_diff_inCaseOf_change: top_diff_value,
         // left_diff_inCaseOf_change: left_diff_value,
@@ -432,7 +439,8 @@ function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_
         border_r: default_border_r,
         border_g: default_border_g,
         border_b: default_border_b,
-        border_a: default_border_a,
+        // border_a: default_border_a,
+        border_a: border_a_value_based_voice,  // 発話タイミングに基づく枠の色の透明度変化
         width_inCaseOf_change: myWindowWidth_tmp_value,
         // top_diff_inCaseOf_change: top_diff_value,
         // left_diff_inCaseOf_change: left_diff_value,
@@ -451,7 +459,8 @@ function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_
         border_r: default_border_r,
         border_g: default_border_g,
         border_b: default_border_b,
-        border_a: default_border_a,
+        // border_a: default_border_a,
+        border_a: border_a_value_based_voice,  // 発話タイミングに基づく枠の色の透明度変化
         width_inCaseOf_change: myWindowWidth_tmp_value,
         // top_diff_inCaseOf_change: top_diff_value,
         // left_diff_inCaseOf_change: left_diff_value,
@@ -538,6 +547,14 @@ export const MainContent = () => {
 
   const [devices, setDevices] = React.useState<MediaDeviceInfo[]>([]);
 
+  // 発話状態を管理するステート
+  const [ isSpeaking, setIsSpeaking ] = useState<boolean>(false);
+  // AudioContextとAnalyserNodeの参照
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserNodeRef = useRef<AnalyserNode | null>(null);
+  const dataArrayRef = useRef<Uint8Array | null>(null);
+  const audtioInputGainNodeRef = useRef<GainNode | null>(null);  // オプション: マイク入力のゲイン調整用
+
   // tokenとvideo要素の参照ができたら実行
   // ビデオの初期設定
   useEffect(() => {
@@ -573,6 +590,28 @@ export const MainContent = () => {
         setLocalStream(stream);
         // eslint-disable-next-line
         // console.log(stream);  // デバッグ用
+
+        // AudtioContextとAnalyserNodeの初期化
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+
+        // LocalAudioStream.trackから新しいMediaStreamを作成
+        const audioMediaStream = new MediaStream([stream.audio.track]);
+
+        const source = audioContextRef.current.createMediaStreamSource(audioMediaStream);
+        analyserNodeRef.current = audioContextRef.current.createAnalyser();
+        analyserNodeRef.current.fftSize = 2048;  // 音声データを分析するサンプル数
+        dataArrayRef.current = new Uint8Array(analyserNodeRef.current.frequencyBinCount);
+
+        // オプション：ゲインノードを追加して，マイク入力レベルを調整できるようにする
+        audtioInputGainNodeRef.current = audioContextRef.current.createGain();
+        audtioInputGainNodeRef.current.gain.value = 1.0;  // デフォルトゲイン
+
+        source.connect(audtioInputGainNodeRef.current);
+        audtioInputGainNodeRef.current.connect(analyserNodeRef.current);
+        // analyserNodeRef.current.connect(audioContextRef.current.destination);  // AnalyserNodeもdestinationに接続しないと音声が聞こえない場合がある
+
+        // 音声レベル監視を開始
+        startAudioLevelMonitoring();
       }
 
       // eslint-disable-next-line
@@ -587,7 +626,94 @@ export const MainContent = () => {
     initialize();
     // eslint-disable-next-line
     // console.log("初期化がされました！");  // デバッグ用
+
+    return () => {
+      // コンポーネントのアンマウント時にAudioContextを閉じる
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+      }
+    }
   }, [token, localVideo]);
+
+  // 音声レベル監視ロジック
+  const startAudioLevelMonitoring = useCallback(() => {
+    const analyser = analyserNodeRef.current;
+    const dataArray = dataArrayRef.current;
+    if (!analyser || !dataArray) return;
+
+    const volumeThreshold = 10;  // 発話と判定するボリュームの閾値（0-255，要調整）
+    const speakingDebounceMs = 200;  // 発話開始/終了の判定を安定させるためのデバウンス時間
+    let speakingTimer: NodeJS.Timeout | null = null;
+    let notSpeakingTimer: NodeJS.Timeout | null = null;
+
+    const checkAudioLevel = () => {
+      analyser.getByteFrequencyData(dataArray);
+      let sum = 0;
+      for (let i = 0; i < dataArray.length; i++) {
+        sum += dataArray[i];
+      }
+      const averageVolume = sum / dataArray.length;
+
+      // eslint-disable-next-line
+      // console.log("平均音量:", averageVolume);  // デバッグ用
+
+      if (averageVolume > volumeThreshold) {
+        // eslint-disable-next-line
+        console.log("isSpeaking（発話開始）: ", isSpeaking);  // デバッグ用
+        // ボリュームが閾値を超えた場合
+        // if (!isSpeaking) {
+          if (speakingTimer === null) {
+            speakingTimer = setTimeout(() => {
+              setIsSpeaking(true);
+              // 発話開始のロジック
+              border_a_value_based_voice = border_a_max;  // 枠の色をつける
+              // 発話開始時に音声認識を開始
+              // if (!listening) {
+                SpeechRecognition.startListening({
+                  continuous: false, // 連続認識を有効にする
+                  language: 'ja'
+                });
+              // }
+              speakingTimer = null;
+            }, speakingDebounceMs);
+          }
+          if (notSpeakingTimer) {
+            clearTimeout(notSpeakingTimer);
+            notSpeakingTimer = null;
+          }
+        // }
+      }
+      else {
+        // eslint-disable-next-line
+        console.log("isSpeaking（発話終了）: ", isSpeaking);  // デバッグ用
+        // ボリュームが閾値を下回った場合
+        // if (isSpeaking) {
+          if (notSpeakingTimer === null) {
+            notSpeakingTimer = setTimeout(() => {
+              setIsSpeaking(false);
+              // 発話終了のロジック
+              border_a_value_based_voice = border_a_min;  // 枠の色を透明にする
+              // 発話終了時に音声認識を停止
+              // if (listening) {
+                SpeechRecognition.stopListening();
+                resetTranscript(); // 次の発話のためにトランスクリプトをリセット
+              // }
+              notSpeakingTimer = null;
+            }, speakingDebounceMs);
+          }
+          if (speakingTimer) {
+            clearTimeout(speakingTimer);
+            speakingTimer = null;
+          }
+        // }
+      }
+
+      // 次のフレームで再度チェック
+      requestAnimationFrame(checkAudioLevel);
+    };
+
+    requestAnimationFrame(checkAudioLevel);
+  }, [isSpeaking]);
 
   // 自分自身のウィンドウの位置・大きさの調整
   const [ myWindowAndAudioAndParticipantsInfo, setMyWindowAndAudioAndParticipantsInfo ] = useState<WindowAndAudioAndParticipantsInfo>({ 
@@ -618,8 +744,9 @@ export const MainContent = () => {
     position: "absolute",
     top: 0,
     left: 0,
-    width: myShowedWindowWidth
-  }), [ ]);
+    width: myShowedWindowWidth,
+    border: `10px solid rgba(${myWindowAndAudioAndParticipantsInfo.border_r}, ${myWindowAndAudioAndParticipantsInfo.border_g}, ${myWindowAndAudioAndParticipantsInfo.border_b}, ${myWindowAndAudioAndParticipantsInfo.border_a})`,
+  }), [ myWindowAndAudioAndParticipantsInfo ]);
 
   // 参加者側のビデオウィンドウのパラメータ（右下）
   // const myWindowAndAudioContainerStyle = useMemo<React.CSSProperties>(() => ({
@@ -629,6 +756,50 @@ export const MainContent = () => {
   //   width: myShowedWindowWidth
   // }), [ ]);
 
+  
+  // 音声の初期設定
+  // const webSpeechAudio = useSpeechRecognition();
+  const {
+    transcript,
+    listening,
+    resetTranscript,
+    browserSupportsSpeechRecognition
+  } = useSpeechRecognition();
+
+  // 発話した時に自分自身の枠の色を変更する処理
+  // useEffect(() => {
+  //   console.log("発話チェック");  // デバッグ用
+  //   if (listening) {
+  //     if (transcript !== "") {
+  //       console.log("発言あり！！");  // デバッグ用
+  //       // 発話内容がある場合には，枠の色をつける
+  //       border_a_value_based_voice = border_a_max;
+  //     }
+  //     else {
+  //       // 発話内容がない場合には，枠の色を透明にする
+  //       border_a_value_based_voice = border_a_min;
+  //     }
+  //   }
+  //   else {
+  //     // 発話していない場合には，枠の色を透明にする
+  //     border_a_value_based_voice = border_a_min;
+  //     resetTranscript();  // 発話内容をリセット
+  //   }
+  // }, [listening, transcript]);
+
+  // isSpeakingステートに基づいて，setMyWindowAndAudioAndParticipantsInfoを更新
+  useEffect(() => {
+    // eslint-disable-next-line
+    console.log("isSpeakingの値が変化しました！", isSpeaking);  // デバッグ用
+    setMyWindowAndAudioAndParticipantsInfo(pre => {
+      // 既存の頭部方向などの情報はそのままに，statusとtextのみを更新
+      return {
+        ...pre,
+        status: isSpeaking,
+        text: isSpeaking ? transcript : "",
+      };
+    })
+  }, [isSpeaking, transcript]);
 
   // myWindowPositionが更新された時の処理
   useEffect(() => {
@@ -642,16 +813,6 @@ export const MainContent = () => {
       // console.log("送信前のwidth_inCaseOf_changeの値：" + myWindowAndAudioAndParticipantsInfo.width_inCaseOf_change);  // デバッグ用
     }
   }, [ myWindowAndAudioAndParticipantsInfo ]);
-
-  
-  // 音声の初期設定
-  // const webSpeechAudio = useSpeechRecognition();
-  const {
-    transcript,
-    listening,
-    resetTranscript,
-    browserSupportsSpeechRecognition
-  } = useSpeechRecognition();
 
   // MediaPipeを用いて，会話相手の頭部方向を取得
   const webcamRef = useRef<Webcam>(null);
@@ -1274,14 +1435,16 @@ export const MainContent = () => {
       <CSVLink data={audioAndParticipantsResults} filename={`C${conditionID}_ID${participantID}_audioAndParticipantsResults.csv`} ref={CSV_AudioAndParticipants_Ref} ></CSVLink>
       <CSVLink data={talkResults} filename={`C${conditionID}_ID${participantID}_talkResults.csv`} ref={CSV_Talk_Ref} ></CSVLink> */}
       <div>
-        {/* <p>Microphone: {listening ? 'on' : 'off'}</p>
-        <button onClick={() => SpeechRecognition.startListening({
-          continuous: true,
-          language: 'ja'
-        })}>Start</button>
-        <button onClick={() => SpeechRecognition.stopListening()}>Stop</button>
-        <button onClick={() => resetTranscript()}>Reset</button> */}
-        <p>トランスクリプト：{transcript}</p>
+        {/*<div>
+          <p>Microphone: {listening ? 'on' : 'off'}</p>
+          <button onClick={() => SpeechRecognition.startListening({
+            continuous: false,
+            language: 'ja'
+          })}>Start</button>
+          <button onClick={() => { SpeechRecognition.stopListening(); }}>Stop</button>
+          <button onClick={() => resetTranscript()}>Reset</button>
+        </div>*/}
+        {/*<p>トランスクリプト：{transcript}</p>*/}
       </div>
       {/* <div className="field-area" tabIndex={-1} onKeyDown={ onKeyDown }> */}
         <div className="icon-container">
