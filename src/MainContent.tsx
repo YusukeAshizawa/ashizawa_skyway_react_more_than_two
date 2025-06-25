@@ -6,7 +6,7 @@ import { FaceMesh, Results } from '@mediapipe/face_mesh';
 import { Camera } from "@mediapipe/camera_utils";
 import Webcam from "react-webcam";
 import { CSVLink } from "react-csv";
-// import webgazer, { GazeData } from 'webgazer';
+// import webgazer, { GazeData } from 'webgazer';  // 使えそうなら，WebGazer.jsを使う
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 
 // 参加者ID
@@ -15,11 +15,7 @@ let participantID = 1;
 let conditionID = 1;
 // 条件名
 let conditionName = "Baseline";
-// ルーム名
-// let roomName = "";
 
-// CSVファイルとして書き出すデータの収集を開始するタイミングの制御
-// let nowTest = false;
 // 計測スタート時間
 let startTime = 0;
 
@@ -60,40 +56,6 @@ interface CSV_HeadDirection_Info {
   otherDirection: string;
   otherWindowWidth: number;
   otherStatus_gaze: string;
-}
-
-// CSVファイルに書き出す視線の情報
-interface CSV_Gaze_Info {
-  ID: number;
-  condition: number;
-  startTime: number;
-  endTime: number;
-  myGazeX: number;
-  myGazeY: number;
-}
-
-// CSVファイルに書き出す音声データ・参加者の状態（発話者か否か）の情報
-interface CSV_AudioAndParticipants_Info {
-  ID: number;
-  Condition: number;
-  startTime: number;
-  endTime: number;
-  myStatus: boolean;
-  myText: string;
-  otherStatus: boolean;
-  otherText: string;
-}
-
-// CSVファイルに書き出す発話内容の情報
-interface CSV_Talk_Info {
-  ID: number;
-  Condition: number;
-  startTime: number;
-  endTime: number;
-  myStatus: boolean;
-  myText: string;
-  otherStatus: boolean;
-  otherText: string;
 }
 
 // 数値型リストの要素の平均値を求める関数
@@ -159,8 +121,7 @@ let screenMyHeight = window.screen.height;
 let scrollMyX = window.scrollX;
 let scrollMyY = window.scrollY;
 
-// ビデオウィンドウの大きさの最小値・最大値
-// （最小値：スクリーンの幅の70%・最大値：1000（SkyWayの通信でのウィンドウサイズの最大値））
+// ビデオウィンドウの大きさの最小値・最大値（最小値：スクリーンの幅の70%・最大値：1000（SkyWayの通信でのウィンドウサイズの最大値））
 const width_max = 1000;
 const width_min = width_max * 0.8;
 // 移動量の拡大率
@@ -168,7 +129,6 @@ const distance_rate_move = 10000;
 
 // ビデオウィンドウの大きさのデフォルト値（参加者・対話相手共通）
 const default_width = (width_min + width_max) / 2;
-// const HeightPerWidthRate = 0.75;
 
 // 位置の移動を行う場合の，スクリーンの中心からのずれ
 const default_top_diff = 0;
@@ -237,24 +197,6 @@ function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_
   // ビデオウィンドウの枠の色の透明度の変更
   let border_a_value = border_a_max * next_border_a_rate;
 
-  // // 移動平均を導入するために，値を保存（ビデオウィンドウの大きさ・ビデオウィンドウの枠の色の透明度）
-  // move_width.push(width_value);
-  // move_border_a.push(border_a_value);
-
-  // // 移動平均の計算 + リストの肥大化の防止（ビデオウィンドウの大きさ）
-  // if (move_width.length < MovingAverage_frame) width_value = Average_value(move_width, 0, move_width.length - 1);
-  // else{
-  //   if (move_width.length > MovingAverage_frame + 10) move_width.shift();
-  //   width_value = Average_value(move_width, move_width.length - MovingAverage_frame, move_width.length - 1);
-  // }
-
-  // // 移動平均の計算 + リストの肥大化の防止（ビデオウィンドウの大きさ）
-  // if (move_border_a.length < MovingAverage_frame) border_a_value = Average_value(move_border_a, 0, move_border_a.length - 1);
-  // else{
-  //   if (move_border_a.length > MovingAverage_frame + 10) move_border_a.shift();
-  //   border_a_value = Average_value(move_border_a, move_border_a.length - MovingAverage_frame, move_border_a.length - 1);
-  // }
-
   // 最小値の考慮（ビデオウィンドウの大きさ・ビデオウィンドウの枠の色の透明度）
   if (width_value < width_min) width_value = width_min;
   if (border_a_value < border_a_min_threshold) border_a_value = border_a_min;
@@ -262,18 +204,6 @@ function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_
   // CSVファイルへの保存用
   // ビデオウィンドウの大きさの一次保存（大きさを変更しない条件でも分析できるようにするため）
   myWindowWidth_tmp_value = width_value;
-  // eslint-disable-next-line
-  // console.log(myWindowWidth_tmp_value);  // デバッグ用
-
-  // ビデオウィンドウの離散変化のための，ウィンドウの大きさの保存（ビデオウィンドウの大きさ）
-  let width_value_discrete = width_min;
-  if (width_value > width_max - (width_max - width_min) * 0.1) {
-    width_value_discrete = width_max;  // 最大サイズ
-  }
-  // else if (width_value > width_min + (width_max - width_min) * 0.1) {
-  //   width_value_discrete = (width_min + width_max) / 2;  // 中間サイズ
-  // }
-  else width_value_discrete = width_min;  // 最小サイズ
 
   // 移動平均を導入するために，値を保存（ビデオウィンドウの大きさ・ビデオウィンドウの枠の色の透明度）
   move_width.push(width_value);
@@ -293,7 +223,14 @@ function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_
     border_a_value = Average_value(move_border_a, move_border_a.length - MovingAverage_frame, move_border_a.length - 1);
   }
 
-  // 参加者の状態（注視状態 or 視線回避状態 or ノーマル）
+  // ビデオウィンドウの離散変化のための，ウィンドウの大きさの保存（ビデオウィンドウの大きさ）
+  let width_value_discrete = width_min;
+  if (width_value > width_max - (width_max - width_min) * 0.1) {
+    width_value_discrete = width_max;  // 最大サイズ
+  }
+  else width_value_discrete = width_min;  // 最小サイズ
+
+  // 参加者の状態（注視状態 or 視線回避状態）
   let status_gaze = "";
   
   // ビデオウィンドウの大きさが最大値の10%以内の時には，注視状態であると判断する
@@ -336,11 +273,10 @@ function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_
         top_diff: default_top_diff,
         left_diff: default_left_diff,
         width: default_width,
-        height: default_width, //  * HeightPerWidthRate,
+        height: default_width,
         border_r: default_border_r,
         border_g: default_border_g,
         border_b: default_border_b,
-        // border_a: default_border_a,
         border_a: border_a_value_based_voice,  // 発話タイミングに基づく枠の色の透明度変化
         width_inCaseOf_change: myWindowWidth_tmp_value,
         // top_diff_inCaseOf_change: top_diff_value,
@@ -356,7 +292,7 @@ function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_
         top_diff: default_top_diff,
         left_diff: default_left_diff,
         width: default_width,
-        height: default_width, //  * HeightPerWidthRate,
+        height: default_width,
         border_r: default_border_r,
         border_g: default_border_g,
         border_b: default_border_b,
@@ -375,11 +311,10 @@ function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_
         top_diff: default_top_diff,
         left_diff: default_left_diff,
         width: width_value,
-        height: width_value, //  * HeightPerWidthRate,
+        height: width_value,
         border_r: default_border_r,
         border_g: default_border_g,
         border_b: default_border_b,
-        // border_a: default_border_a,
         border_a: border_a_value_based_voice,  // 発話タイミングに基づく枠の色の透明度変化
         width_inCaseOf_change: myWindowWidth_tmp_value,
         // top_diff_inCaseOf_change: top_diff_value,
@@ -395,11 +330,10 @@ function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_
         top_diff: default_top_diff,
         left_diff: default_left_diff,
         width: width_value_discrete,
-        height: width_value_discrete, //  * HeightPerWidthRate,
+        height: width_value_discrete,
         border_r: default_border_r,
         border_g: default_border_g,
         border_b: default_border_b,
-        // border_a: default_border_a,
         border_a: border_a_value_based_voice,  // 発話タイミングに基づく枠の色の透明度変化
         width_inCaseOf_change: myWindowWidth_tmp_value,
         // top_diff_inCaseOf_change: top_diff_value,
@@ -415,11 +349,10 @@ function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_
         top_diff: top_diff_value,
         left_diff: left_diff_value,
         width: default_width,
-        height: default_width, //  * HeightPerWidthRate,
+        height: default_width,
         border_r: default_border_r,
         border_g: default_border_g,
         border_b: default_border_b,
-        // border_a: default_border_a,
         border_a: border_a_value_based_voice,  // 発話タイミングに基づく枠の色の透明度変化
         width_inCaseOf_change: myWindowWidth_tmp_value,
         // top_diff_inCaseOf_change: top_diff_value,
@@ -435,11 +368,10 @@ function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_
         top_diff: top_diff_value,
         left_diff: left_diff_value,
         width: width_value,
-        height: width_value, //  * HeightPerWidthRate,
+        height: width_value,
         border_r: default_border_r,
         border_g: default_border_g,
         border_b: default_border_b,
-        // border_a: default_border_a,
         border_a: border_a_value_based_voice,  // 発話タイミングに基づく枠の色の透明度変化
         width_inCaseOf_change: myWindowWidth_tmp_value,
         // top_diff_inCaseOf_change: top_diff_value,
@@ -455,11 +387,10 @@ function setWindowAndAudioAndParticipantsInfo(conditionID: number, fc_d_from_fc_
         top_diff: default_top_diff,
         left_diff: default_left_diff,
         width: default_width,
-        height: default_width, //  * HeightPerWidthRate,
+        height: default_width,
         border_r: default_border_r,
         border_g: default_border_g,
         border_b: default_border_b,
-        // border_a: default_border_a,
         border_a: border_a_value_based_voice,  // 発話タイミングに基づく枠の色の透明度変化
         width_inCaseOf_change: myWindowWidth_tmp_value,
         // top_diff_inCaseOf_change: top_diff_value,
@@ -537,13 +468,7 @@ export const MainContent = () => {
     video: LocalVideoStream;
   }>();
   const [ localDataStream, setLocalDataStream ] = useState<LocalDataStream>();
-  // eslint-disable-next-line
-  // console.log(localDataStream);  // デバッグ用
-  // me.subscribe(publication.id) の戻り値に含まれる stream
-  // (contentType === "data" のもの)
-  const [ otherUserDataStream, setOtherUserDataStream ] = useState<RemoteDataStream>();
-  // eslint-disable-next-line
-  // console.log(otherUserDataStream);  // デバッグ用
+  const [ otherUserDataStream, setOtherUserDataStream ] = useState<RemoteDataStream>();  // me.subscribe(publication.id) の戻り値に含まれる stream (contentType === "data" のもの)
 
   const [devices, setDevices] = React.useState<MediaDeviceInfo[]>([]);
 
@@ -555,14 +480,12 @@ export const MainContent = () => {
   const dataArrayRef = useRef<Uint8Array | null>(null);
   const audtioInputGainNodeRef = useRef<GainNode | null>(null);  // オプション: マイク入力のゲイン調整用
 
-  // tokenとvideo要素の参照ができたら実行
-  // ビデオの初期設定
+  // ビデオの初期設定（tokenとvideo要素の参照ができたら実行）
   useEffect(() => {
     const initialize = async () => {
       if (token == null || localVideo.current == null) return;
 
       // カメラの種類の選択
-      // console.log("-----------");
       navigator.mediaDevices.getUserMedia({
         video: {frameRate: 30}
       }).then((stream) => {
@@ -571,21 +494,15 @@ export const MainContent = () => {
       }
       ).catch(console.error);
       const devices_tmp = (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.label.includes("USB Camera"));
-      // const devices_tmp = (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.kind === "videoinput");
+      // eslint-disable-next-line
       console.log(devices_tmp);
       setDevices(devices_tmp);
-      // SkyWayStreamFactory.enumerateInputVideoDevices().then((raw_devices) => {
-      //   setDevices(raw_devices)
-      // })
 
-      // eslint-disable-next-line
-      // console.log(devices);  // デバッグ用
-
-      // const stream = 
-      //     await SkyWayStreamFactory.createMicrophoneAudioAndCameraStream({video: {deviceId: devices_tmp[0].deviceId}});
       if(localStream == null) {
         const stream = 
           await SkyWayStreamFactory.createMicrophoneAudioAndCameraStream();
+      // const stream = 
+      //  await SkyWayStreamFactory.createMicrophoneAudioAndCameraStream({video: {deviceId: devices_tmp[0].deviceId}});
         stream.video.attach(localVideo.current);
         setLocalStream(stream);
         // eslint-disable-next-line
@@ -608,14 +525,10 @@ export const MainContent = () => {
 
         source.connect(audtioInputGainNodeRef.current);
         audtioInputGainNodeRef.current.connect(analyserNodeRef.current);
-        // analyserNodeRef.current.connect(audioContextRef.current.destination);  // AnalyserNodeもdestinationに接続しないと音声が聞こえない場合がある
 
         // 音声レベル監視を開始
         startAudioLevelMonitoring();
       }
-
-      // eslint-disable-next-line
-      // console.log([token, localVideo]);
 
       const dataStream = await SkyWayStreamFactory.createDataStream();
 
@@ -625,7 +538,7 @@ export const MainContent = () => {
 
     initialize();
     // eslint-disable-next-line
-    // console.log("初期化がされました！");  // デバッグ用
+    // console.log("初期化されました！");  // デバッグ用
 
     return () => {
       // コンポーネントのアンマウント時にAudioContextを閉じる
@@ -661,19 +574,16 @@ export const MainContent = () => {
         // eslint-disable-next-line
         console.log("isSpeaking（発話開始）: ", isSpeaking);  // デバッグ用
         // ボリュームが閾値を超えた場合
-        // if (!isSpeaking) {
           if (speakingTimer === null) {
             speakingTimer = setTimeout(() => {
               setIsSpeaking(true);
               // 発話開始のロジック
               border_a_value_based_voice = border_a_max;  // 枠の色をつける
               // 発話開始時に音声認識を開始
-              // if (!listening) {
-                SpeechRecognition.startListening({
-                  continuous: false, // 連続認識を有効にする
-                  language: 'ja'
-                });
-              // }
+              SpeechRecognition.startListening({
+                continuous: false, // 連続認識を有効にする
+                language: 'ja'
+              });
               speakingTimer = null;
             }, speakingDebounceMs);
           }
@@ -681,23 +591,19 @@ export const MainContent = () => {
             clearTimeout(notSpeakingTimer);
             notSpeakingTimer = null;
           }
-        // }
       }
       else {
         // eslint-disable-next-line
         console.log("isSpeaking（発話終了）: ", isSpeaking);  // デバッグ用
         // ボリュームが閾値を下回った場合
-        // if (isSpeaking) {
           if (notSpeakingTimer === null) {
             notSpeakingTimer = setTimeout(() => {
               setIsSpeaking(false);
               // 発話終了のロジック
               border_a_value_based_voice = border_a_min;  // 枠の色を透明にする
               // 発話終了時に音声認識を停止
-              // if (listening) {
-                SpeechRecognition.stopListening();
-                resetTranscript(); // 次の発話のためにトランスクリプトをリセット
-              // }
+              SpeechRecognition.stopListening();
+              resetTranscript(); // 次の発話のためにトランスクリプトをリセット
               notSpeakingTimer = null;
             }, speakingDebounceMs);
           }
@@ -705,7 +611,6 @@ export const MainContent = () => {
             clearTimeout(speakingTimer);
             speakingTimer = null;
           }
-        // }
       }
 
       // 次のフレームで再度チェック
@@ -724,9 +629,7 @@ export const MainContent = () => {
     theta: 0, status: false, text: "", status_gaze: ""
   });
 
-  const Text_height = 25;  // テキスト部分の高さ
-
-  // 参加者側のビデオウィンドウのパラメータ
+  // 参加者側のビデオウィンドウのパラメータ（自分自身のビデオウィンドウを変更する時に利用）
   // const myWindowAndAudioContainerStyle = useMemo<React.CSSProperties>(() => ({
   //     position: "absolute",
   //     top: scrollMyY + screenMyHeight / 2 - myWindowAndAudioAndParticipantsInfo.height / 2 + myWindowAndAudioAndParticipantsInfo.top_diff < 0 ? 0 :
@@ -743,49 +646,18 @@ export const MainContent = () => {
   const myWindowAndAudioContainerStyle = useMemo<React.CSSProperties>(() => ({
     position: "absolute",
     top: 0,
-    left: 0,
+    left: 0,  // 右上の場合（右下の場合：window.innerWidth - myShowedWindowWidth - 20）
     width: myShowedWindowWidth,
     border: `10px solid rgba(${myWindowAndAudioAndParticipantsInfo.border_r}, ${myWindowAndAudioAndParticipantsInfo.border_g}, ${myWindowAndAudioAndParticipantsInfo.border_b}, ${myWindowAndAudioAndParticipantsInfo.border_a})`,
   }), [ myWindowAndAudioAndParticipantsInfo ]);
-
-  // 参加者側のビデオウィンドウのパラメータ（右下）
-  // const myWindowAndAudioContainerStyle = useMemo<React.CSSProperties>(() => ({
-  //   position: "absolute",
-  //   top: 0,
-  //   left: window.innerWidth - myShowedWindowWidth - 20,
-  //   width: myShowedWindowWidth
-  // }), [ ]);
-
   
   // 音声の初期設定
-  // const webSpeechAudio = useSpeechRecognition();
   const {
     transcript,
     listening,
     resetTranscript,
     browserSupportsSpeechRecognition
   } = useSpeechRecognition();
-
-  // 発話した時に自分自身の枠の色を変更する処理
-  // useEffect(() => {
-  //   console.log("発話チェック");  // デバッグ用
-  //   if (listening) {
-  //     if (transcript !== "") {
-  //       console.log("発言あり！！");  // デバッグ用
-  //       // 発話内容がある場合には，枠の色をつける
-  //       border_a_value_based_voice = border_a_max;
-  //     }
-  //     else {
-  //       // 発話内容がない場合には，枠の色を透明にする
-  //       border_a_value_based_voice = border_a_min;
-  //     }
-  //   }
-  //   else {
-  //     // 発話していない場合には，枠の色を透明にする
-  //     border_a_value_based_voice = border_a_min;
-  //     resetTranscript();  // 発話内容をリセット
-  //   }
-  // }, [listening, transcript]);
 
   // isSpeakingステートに基づいて，setMyWindowAndAudioAndParticipantsInfoを更新
   useEffect(() => {
@@ -809,8 +681,6 @@ export const MainContent = () => {
       localDataStream.write(myWindowAndAudioAndParticipantsInfo);
       // eslint-disable-next-line
       // console.log("自分のデータを送信しました！");  // デバッグ用
-      // eslint-disable-next-line
-      // console.log("送信前のwidth_inCaseOf_changeの値：" + myWindowAndAudioAndParticipantsInfo.width_inCaseOf_change);  // デバッグ用
     }
   }, [ myWindowAndAudioAndParticipantsInfo ]);
 
@@ -820,15 +690,6 @@ export const MainContent = () => {
   // 自分・会話相手の頭部方向のログデータをCSVファイルとして書き出す
   const CSV_HeadDirection_Ref = useRef<CSVLink & HTMLAnchorElement & { link: HTMLAnchorElement }>(null);
   const [headDirectionResults, setHeadDirectionResults] = useState<CSV_HeadDirection_Info[]>([]);
-  // 自分・会話相手の視線のログデータをCSVファイルとして書き出す
-  // const CSV_Gaze_Ref = useRef<CSVLink & HTMLAnchorElement & { link: HTMLAnchorElement }>(null);
-  // const [gazeResults, setGazeResults] = useState<CSV_Gaze_Info[]>([]);
-  // 音声データをCSVファイルとして書き出す
-  // const CSV_AudioAndParticipants_Ref = useRef<CSVLink & HTMLAnchorElement & { link: HTMLAnchorElement }>(null);
-  // const [audioAndParticipantsResults, setAudioAndParticipantsResults] = useState<CSV_AudioAndParticipants_Info[]>([]);
-  // 会話全体の発話内容のログデータをCSVファイルとして書き出す
-  // const CSV_Talk_Ref = useRef<CSVLink & HTMLAnchorElement & { link: HTMLAnchorElement }>(null);
-  // const [talkResults, setTalkResults] = useState<CSV_Talk_Info[]>([]);
 
   /** 検出結果（フレーム毎に呼び出される） */
   const onResults = useCallback((results: Results) => {
@@ -844,7 +705,7 @@ export const MainContent = () => {
       let landmarks_pos_x: number[] = []  // 468個の点のx座標を格納するリスト
       let landmarks_pos_y: number[] = []  // 468個の点のy座標を格納するリスト
       let face_center_default_pos: number[] = []  // 正面を向いた時の顔の中心点（ここでは，飯塚さんの修論に倣って，鼻の先の座標としている．）
-      // const Start_OnePoint = performance.now();  // 1点の処理の開始時刻
+      // const Start_OnePoint = performance.now();  // 1点の処理の開始時刻（処理時間計測用）
       if (results.multiFaceLandmarks && results.multiFaceLandmarks[0]) {
         for (let id = 0; id < results.multiFaceLandmarks[0].length; id++) {
           // 特定の顔の点を取得（x座標）
@@ -873,19 +734,13 @@ export const MainContent = () => {
       }
       // 顔の中心点の座標
       const face_center_pos = [Average_value(landmarks_pos_x), Average_value(landmarks_pos_y)];
-      // const End_OnePoint = performance.now();  // 1点の処理の終了時刻
+      // const End_OnePoint = performance.now();  // 1点の処理の終了時刻（処理時間計測用）
       // eslint-disable-next-line
       // console.log("処理時間：" + (End_OnePoint - Start_OnePoint) + "ミリ秒");  // デバッグ用
       // 頭部方向を計算するためのベクトル
       const base_vector = [1,0];
       // 顔の中心点を原点とした時の，正面を向いた際の顔の中心点のベクトル
       const fc_d_from_fc_vector = [face_center_default_pos[0] - face_center_pos[0], face_center_default_pos[1] - face_center_pos[1]];
-      // eslint-disable-next-line
-      // console.log("face_center_pos = " + face_center_default_pos);  // デバッグ用
-      // eslint-disable-next-line
-      // console.log("face_center_default_pos = " + face_center_default_pos);  // デバッグ用
-      // eslint-disable-next-line
-      // console.log("fc_d_from_fc_vector = " + fc_d_from_fc_vector);  // デバッグ用
       
       // 頭部方向（ラジアン）
       let rad_head_direction = Math.acos(Inner(base_vector, fc_d_from_fc_vector) / (Norm(base_vector) * Norm(fc_d_from_fc_vector)));
@@ -896,23 +751,14 @@ export const MainContent = () => {
         rad_head_direction = -rad_head_direction;
         theta_head_direction = 360 - theta_head_direction;
       }
-      // eslint-disable-next-line
-      // console.log("theta_head_direction = " + theta_head_direction);  // デバッグ用
-      // eslint-disable-next-line
-      // console.log("diff_top = " + distance_rate_move * Norm(fc_d_from_fc_vector) * Math.sin(rad_head_direction));  // デバッグ用
-      // eslint-disable-next-line
-      // console.log("diff_left = " + distance_rate_move * Norm(fc_d_from_fc_vector) * Math.cos(rad_head_direction));  // デバッグ用
 
-      // widthの範囲：100~500？
+      // widthの範囲：800px~1000px
       // 要検討：ウィンドウの動きとユーザの実際の動きを合わせるために，左右反転させる？
-      // 自分自身のスクリーンに対するビデオウィンドウの位置の更新（index = 0：自分自身側のスクリーン基準，index = 1：対話相手側のスクリーン基準）
-      setMyWindowAndAudioAndParticipantsInfo(pre => setWindowAndAudioAndParticipantsInfo(conditionID, fc_d_from_fc_vector, rad_head_direction, theta_head_direction, false, ""));
-      // setMyWindowAndAudioAndParticipantsInfo(pre => setWindowAndAudioAndParticipantsInfo(conditionID, fc_d_from_fc_vector, rad_head_direction, theta_head_direction, isSpeaker, webSpeechAudio != null ? webSpeechAudio.transcript : ""));
+      setMyWindowAndAudioAndParticipantsInfo(pre => setWindowAndAudioAndParticipantsInfo(conditionID, fc_d_from_fc_vector, rad_head_direction, theta_head_direction, isSpeaking, isSpeaking ? transcript : ""));
     }
   },[]);
 
-  // 他ユーザの座標情報を保持
-  // （これを自分のアイコンと同様に画面表示用のstyleに反映する）
+  // 他ユーザの座標情報を保持（これを自分のアイコンと同様に画面表示用のstyleに反映する）
   const [ otherUserWindowAndAudioAndParticipantsInfo, setOtherUserWindowAndAudioAndParticipantsInfo ] = useState<WindowAndAudioAndParticipantsInfo>({
     top_diff: default_top_diff, left_diff: default_left_diff, width: default_width, height: default_width, //  * HeightPerWidthRate,
     border_r: default_border_r, border_g: default_border_g, border_b: default_border_b, border_a: default_border_a, 
@@ -920,8 +766,7 @@ export const MainContent = () => {
     width_inCaseOf_change: 0, theta: 0, status: false, text: "", status_gaze: ""
    });
 
-  // 他ユーザのウィンドウの位置・大きさの変更
-  // フィールド領域をはみ出ないように調整を入れる（これ，要る？）
+  // 他ユーザのウィンドウの位置・大きさの変更（フィールド領域をはみ出ないように調整を入れる）
   const otherUserWindowAndAudioContainerStyle = useMemo<React.CSSProperties>(() => ({
     position: "absolute",
     top: // window.screenTop + scrollMyY - Text_height - (window.outerHeight - window.innerHeight)  // デフォルト（初期位置）
@@ -956,18 +801,6 @@ export const MainContent = () => {
     border: `10px solid rgba(${otherUserWindowAndAudioAndParticipantsInfo.border_r}, ${otherUserWindowAndAudioAndParticipantsInfo.border_g}, ${otherUserWindowAndAudioAndParticipantsInfo.border_b}, ${otherUserWindowAndAudioAndParticipantsInfo.border_a})`
   }), [ otherUserWindowAndAudioAndParticipantsInfo ]);
 
-  // const div_active_after_conference_Ref = useRef<HTMLDivElement>(null); // 会議中に表示されるコンポーネントへのrefを作成
-  // const [div_active_after_conference_Height, setDiv_active_after_conference_Height] = useState<number | null>(null); // 会議中に表示されるコンポーネントの高さ
-
-  // 会議中に表示されるコンポーネントの高さを取得
-  // useEffect(() => {
-  //   if (div_active_after_conference_Ref.current) {
-  //     // ref経由でdivの高さを取得
-  //     const height = div_active_after_conference_Ref.current.offsetHeight;
-  //     setDiv_active_after_conference_Height(height); // stateに保存
-  //   }
-  // }, []); // 初回レンダリング時のみ実行
-
   useEffect(() => {
     // eslint-disable-next-line
     // console.log("相手のデータ受信設定");
@@ -978,26 +811,15 @@ export const MainContent = () => {
         // console.log(args);  // デバッグ用
         setOtherUserWindowAndAudioAndParticipantsInfo(args as WindowAndAudioAndParticipantsInfo);
         // eslint-disable-next-line
-        // console.log("bbb");  // デバッグ用
-        // eslint-disable-next-line
-        // console.log(args);  // デバッグ用
-        // eslint-disable-next-line
-        // console.log("対話相手のスクリーンの幅（送信後） = " + screenOtherWidth);  // デバッグ用
-        // eslint-disable-next-line
-        // console.log("対話相手のスクリーンの高さ（送信後） = " + screenOtherHeight);  // デバッグ用
-        // eslint-disable-next-line
         // console.log("相手のデータを受信しました！");  // デバッグ用
         // eslint-disable-next-line
-        // console.log(otherUserWindowAndAudioAndParticipantsInfo.width_inCaseOf_change);  // デバッグ用
+        // console.log(args);  // デバッグ用
       });
     }
   }, [ otherUserDataStream ]);
 
   // 計測開始時間の定義
   const [startTime_HeadDirection, setStartTime_HeadDirection] = useState<number>(0);
-  // const [startTime_Gaze, setStartTime_Gaze] = useState<number>(0);
-  // const [startTime_AudioAndParticipants, setStartTime_AudioAndParticipants] = useState<number>(0);
-  // const [startTime_Talk, setStartTime_Talk] = useState<number>(0);
 
   const [nowTest, setNowTest] = useState<boolean>(false);
 
@@ -1007,10 +829,6 @@ export const MainContent = () => {
       // console.log(nowTest);  // デバッグ用
       if (otherUserDataStream != null) {
         if (nowTest) {
-          // eslint-disable-next-line
-          // console.log("スクリーンの幅：" + screenMyWidth + "，スクリーンの高さ：" + screenMyHeight);  // デバッグ用
-          // eslint-disable-next-line
-          // console.log("スクロール量：" + "X = " + scrollMyX + "，Y = " + scrollMyY);  // デバッグ用
           const nowTime_HeadDirection = (performance.now() - startTime) / 1000;
           setHeadDirectionResults((prev) => [
             ...prev,
@@ -1021,96 +839,9 @@ export const MainContent = () => {
               otherTheta: otherUserWindowAndAudioAndParticipantsInfo.theta, otherDirection: getParticipantDirection(otherUserWindowAndAudioAndParticipantsInfo.theta), otherWindowWidth: otherUserWindowAndAudioAndParticipantsInfo.width_inCaseOf_change, otherStatus_gaze: otherUserWindowAndAudioAndParticipantsInfo.status_gaze }
           ]);
           setStartTime_HeadDirection(nowTime_HeadDirection);
-          // const nowTime_AudioAndParticipants = (performance.now() - startTime) / 1000;
-          // setAudioAndParticipantsResults((prev) => [
-          //   ...prev,
-          //   { ID: participantID, Condition: conditionID, startTime: startTime_AudioAndParticipants, endTime: nowTime_AudioAndParticipants, myStatus: myWindowAndAudioAndParticipantsInfo.status, myText: myWindowAndAudioAndParticipantsInfo.text, otherStatus: otherUserWindowAndAudioAndParticipantsInfo.status, otherText: otherUserWindowAndAudioAndParticipantsInfo.text }
-          // ]);
-          // setStartTime_AudioAndParticipants(nowTime_AudioAndParticipants);
         }
       }
   }, [ otherUserWindowAndAudioAndParticipantsInfo ]);
-
-  // 話し手か否かの判定 + listeningがfalseになった時、trueにする
-  // const [isSpeaker, setIsSpeaker] = useState<boolean>(false);
-
-  // useEffect(() => {
-  //   if (otherUserDataStream != null && webSpeechAudio != null) {
-  //     if (nowTest) {
-  //       // eslint-disable-next-line
-  //       console.log("transcript：" + webSpeechAudio.transcript);  // デバッグ用
-  //       if (webSpeechAudio.transcript) {
-  //         if(!isSpeaker) {
-  //           setIsSpeaker(true);
-  //           setStartTime_Talk((performance.now() - startTime) / 1000);  // 自分の発話開始
-  //         }
-  //       }
-  //       else {
-  //         setIsSpeaker(false);
-  //       }
-
-  //       // eslint-disable-next-line
-  //       // console.log('SpeechRecognition is listening：' + webSpeechAudio.listening);  // デバッグ用
-  //       // if (!webSpeechAudio.listening) {
-  //       //   SpeechRecognition.startListening({
-  //       //     continuous: true,
-  //       //     language: 'ja'
-  //       //   });
-  //       // }
-
-  //       // 発話が完全に終了したタイミングも書き出しておく（発話内容を後々見返せるようにするため）
-  //       if (webSpeechAudio.finalTranscript) {
-  //         const nowTime_Talk = (performance.now() - startTime) / 1000;
-  //         setTalkResults((prev) => [
-  //           ...prev,
-  //           { ID: participantID, Condition: conditionID, startTime: startTime_Talk, endTime: nowTime_Talk, myStatus: isSpeaker, myText: webSpeechAudio.finalTranscript, otherStatus: otherUserWindowAndAudioAndParticipantsInfo.status, otherText: otherUserWindowAndAudioAndParticipantsInfo.text }
-  //         ]);
-  //       }
-  //     }
-  //   }
-  // },[ otherUserWindowAndAudioAndParticipantsInfo, webSpeechAudio]);
-
-  // listeningがfalseになった時、trueにする（飯塚さんのコード参照）
-  // useEffect(() => {
-  //   if (otherUserDataStream != null && webSpeechAudio != null) {
-  //     if (nowTest) {
-  //       SpeechRecognition.startListening({
-  //         continuous: true,
-  //         language: 'ja'
-  //       });
-
-  //       // 発話が完全に終了したタイミングも書き出しておく（発話内容を後々見返せるようにするため）
-  //       if (webSpeechAudio.finalTranscript) {
-  //         const nowTime_Talk = (performance.now() - startTime) / 1000;
-  //         setTalkResults((prev) => [
-  //           ...prev,
-  //           { ID: participantID, Condition: conditionID, startTime: startTime_Talk, endTime: nowTime_Talk, myStatus: isSpeaker, myText: webSpeechAudio.finalTranscript, otherStatus: otherUserWindowAndAudioAndParticipantsInfo.status, otherText: otherUserWindowAndAudioAndParticipantsInfo.text }
-  //         ]);
-  //       }
-  //     }
-  //   }
-  // },[webSpeechAudio.listening]);
-
-  // // transcriptに値がある時、自分自身を話し手として判定する（飯塚さんのコード参照）
-  // useEffect(() => {
-  //   if (otherUserDataStream != null && webSpeechAudio != null) {
-  //     if (nowTest) {
-  //       // eslint-disable-next-line
-  //       console.log("transcript：" + webSpeechAudio.transcript);  // デバッグ用
-  //       if (webSpeechAudio.transcript) {
-  //         // eslint-disable-next-line
-  //         console.log("isSpeaker：" + isSpeaker);  // デバッグ用
-  //         if(!isSpeaker) {
-  //           setIsSpeaker(true);
-  //           setStartTime_Talk((performance.now() - startTime) / 1000);  // 自分の発話開始
-  //         }
-  //       }
-  //       else {
-  //         setIsSpeaker(false);
-  //       }
-  //     }
-  //   }
-  // },[webSpeechAudio.transcript]);
 
   const [roomName, setRoomName] = useState("");
 
@@ -1173,14 +904,9 @@ export const MainContent = () => {
         const { stream } = await me.subscribe(e.publication.id);
         // ここは必ずRemoteDataStreamになるはず
         if (stream.contentType === "data") {
-          // eslint-disable-next-line
-          // console.log("!!!!!!!!!", stream);  // デバッグ用
           setOtherUserDataStream(stream);
-          // データ受信時のcallbackを登録
-          // const { removeListener } = stream.onData.add((data) => setOtherUserWindowPosition(data as WindowPosition));
-    
-          // 購読解除する時
-          // removeListener();
+          // eslint-disable-next-line
+          // console.log("DataStreamにセットしました！");  // デバッグ用
         }
       }
     });
@@ -1219,32 +945,6 @@ export const MainContent = () => {
       camera.start();
     }
 
-    // eslint-disable-next-line
-    // console.log(localVideo.current!);
-    // console.log(localVideo.current!.readyState);
-
-    // const stream = navigator.mediaDevices.getUserMedia({
-    //   video: {deviceId: devices[0].deviceId}
-    // });
-
-    // if (localVideo.current! && localVideo.current.readyState !== 0) {
-    //   // eslint-disable-next-line
-    //   console.log(localVideo.current!);
-    //   const camera = new Camera(localVideo.current!, {
-    //     onFrame: async () => {
-    //       await faceMesh.send({ image: localVideo.current! });
-    //     }
-    //   });
-    //   // eslint-disable-next-line
-    //   console.log("MediaPipe用カメラの起動");  // デバッグ用
-    //   // eslint-disable-next-line
-    //   console.log(camera);
-    //   camera.start();
-    // }
-
-    // eslint-disable-next-line
-    // console.log(faceMesh);  // デバッグ用
-
     return () => {
         faceMesh.close();
     }
@@ -1269,61 +969,9 @@ export const MainContent = () => {
     ]);
     setStartTime_HeadDirection(0);
 
-    // 視線の書き出し開始
-    // setGazeResults([
-    //   { ID: participantID, condition: conditionID, startTime: 0, endTime: 0, myGazeX: 0, myGazeY: 0 }
-    // ]);
-    // setStartTime_Gaze(0);
-
-    // // 音声データ・参加者の状態（発話者か否か）の書き出し開始
-    // setAudioAndParticipantsResults([
-    //   { ID: participantID, Condition: conditionID, startTime: 0, endTime: 0, myStatus: false, myText: "", otherStatus: false, otherText: "" }
-    // ]);
-    // setStartTime_AudioAndParticipants(0);
-
-    // // 会話の内容の書き出し開始
-    // setTalkResults([
-    //   { ID: participantID, Condition: conditionID, startTime: 0, endTime: 0, myStatus: false, myText: "", otherStatus: false, otherText: "" }
-    // ]);
-    // setStartTime_Talk(0);
-
-    // WebGazer.jsを用いた視線取得開始
-    // const webgazer = (window as any).webgazer;
-    // if (webgazer) {
-    //   webgazer.setGazeListener((data: any, timestamp: number) => {
-    //     if (data) {
-    //       const nowTime_Gaze = (performance.now() - startTime) / 1000;
-    //       setGazeResults((prev) => [
-    //         ...prev,
-    //         { ID: participantID, condition: conditionID, startTime: startTime_Gaze, endTime: nowTime_Gaze, myGazeX: data.x, myGazeY: data.y }
-    //       ]);
-    //       setStartTime_Gaze(nowTime_Gaze);  // (何故か更新されない...)
-    //       // eslint-disable-next-line
-    //       console.log(startTime_Gaze);  // デバッグ用
-    //       // eslint-disable-next-line
-    //       // console.log(`X: ${data.x}, Y: ${data.y}`);  // デバッグ用
-    //     }
-    //   });
-    // }
-
-    // if (!webSpeechAudio.browserSupportsSpeechRecognition) {
-    //   // eslint-disable-next-line
-    //   console.error("ブラウザが音声認識をサポートしていません。");  // デバッグ用
-    // }
-
-    // // SpeechRecognition.abortListening();  // 一旦音声リセット
-
-    // 音声認識の開始
-    // eslint-disable-next-line
-    console.log(SpeechRecognition);  // デバッグ用
-    SpeechRecognition.startListening({ 
-      continuous: true, 
-      language: 'ja'
-    });
-
+    // ログデータの書き出し開始
     startTime = performance.now();
     setNowTest(true);
-    // nowTest = true;
   }
 
   // データ計測終了
@@ -1335,22 +983,11 @@ export const MainContent = () => {
     }
 
     setNowTest(false);
-    // nowTest = false;
-    SpeechRecognition.stopListening();  // 音声認識の終了
     CSV_HeadDirection_Ref?.current?.link.click();
-    // CSV_Gaze_Ref?.current?.link.click();
-    // CSV_AudioAndParticipants_Ref?.current?.link.click();
-    // CSV_Talk_Ref?.current?.link.click();
 
     // CSVファイルに書き出すデータをコンソールにも出してみる
     // eslint-disable-next-line
-    console.log(headDirectionResults);  // デバッグ用
-    // // eslint-disable-next-line
-    // console.log(gazeResults);  // デバッグ用
-    // // eslint-disable-next-line
-    // console.log(audioAndParticipantsResults);  // デバッグ用
-    // // eslint-disable-next-line
-    // console.log(talkResults);  // デバッグ用
+    // console.log(headDirectionResults);  // デバッグ用
   }
   
   return (
@@ -1431,22 +1068,9 @@ export const MainContent = () => {
         <button onClick={testEnd} disabled={!nowTest}>Measurement End</button>
       </div>
       <CSVLink data={headDirectionResults} filename={`C${conditionID}_ID${participantID}_headDirectionResults.csv`} ref={CSV_HeadDirection_Ref} ></CSVLink>
-      {/* <CSVLink data={gazeResults} filename={`C${conditionID}_ID${participantID}_gazeResults.csv`} ref={CSV_Gaze_Ref} ></CSVLink>
-      <CSVLink data={audioAndParticipantsResults} filename={`C${conditionID}_ID${participantID}_audioAndParticipantsResults.csv`} ref={CSV_AudioAndParticipants_Ref} ></CSVLink>
-      <CSVLink data={talkResults} filename={`C${conditionID}_ID${participantID}_talkResults.csv`} ref={CSV_Talk_Ref} ></CSVLink> */}
       <div>
-        {/*<div>
-          <p>Microphone: {listening ? 'on' : 'off'}</p>
-          <button onClick={() => SpeechRecognition.startListening({
-            continuous: false,
-            language: 'ja'
-          })}>Start</button>
-          <button onClick={() => { SpeechRecognition.stopListening(); }}>Stop</button>
-          <button onClick={() => resetTranscript()}>Reset</button>
-        </div>*/}
         {/*<p>トランスクリプト：{transcript}</p>*/}
       </div>
-      {/* <div className="field-area" tabIndex={-1} onKeyDown={ onKeyDown }> */}
         <div className="icon-container">
         {
           me != null && otherUserPublications.map(p => (
@@ -1458,7 +1082,6 @@ export const MainContent = () => {
           <Webcam id="local-video-webcam" ref={webcamRef} videoConstraints={{ deviceId: devices?.[0]?.deviceId }} muted playsInline style={myWindowAndAudioContainerStyle}/>
         </div>
         </div>
-      {/* </div> */}
     </div>
   )
 }
