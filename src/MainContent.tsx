@@ -1,6 +1,6 @@
 // --- Import Statements ---
 import { 
-  LocalAudioStream, LocalDataStream, LocalP2PRoomMember, LocalStream, LocalVideoStream,
+  LocalAudioStream, LocalDataStream, LocalRoomMember, LocalStream, LocalVideoStream,
   RemoteDataStream, RoomPublication,
   SkyWayAuthToken, SkyWayContext, SkyWayRoom, SkyWayStreamFactory,
   nowInSec, uuidV4
@@ -38,7 +38,7 @@ const defaultWidth = (AppConstants.WIDTH_MAX + AppConstants.WIDTH_MIN) / 2;  // 
 const defaultBorderColor = AppConstants.BORDER_COLORS.GREEN;  // ビデオウィンドウの枠の色のデフォルト値（参加者・対話相手共通）
 
 // --- Interfaces ---
-interface WindowAndAudioAndParticipantsInfo {
+export interface WindowAndAudioAndParticipantsInfo {
     topDiff: number;  // 位置を移動させる場合の上下方向の変化量
     leftDiff: number;  // 位置を移動させる場合の左右方向の変化量
     width: number;
@@ -65,12 +65,13 @@ interface CSV_HeadDirection_Info {
   myStatusGaze: string;
   myIsSpeaking: boolean;
   myTranscript: string;
-  otherTheta: number;
-  otherDirection: string;
-  otherWindowWidth: number;
-  otherStatusGaze: string;
-  otherIsSpeaking: boolean;
-  otherTranscript: string;
+  [key: string]: any;  // インデックスシグネチャを追加して動的なプロパティを許可
+  // otherTheta: number;
+  // otherDirection: string;
+  // otherWindowWidth: number;
+  // otherStatusGaze: string;
+  // otherIsSpeaking: boolean;
+  // otherTranscript: string;
 }  // CSVファイルに書き出す頭部方向の情報
 
 // --- Utility Functions ---
@@ -113,25 +114,26 @@ let participantID = 1;  // 参加者ID
 let conditionID = 1;  // 条件番号・条件名
 let conditionName = "Baseline";  // 条件名
 let startTime = 0;  // 計測開始時間
-let scrollMyX = window.scrollX;  // 自分自身（参加者側）のスクロール位置（X座標）
 let moveWidths: number[] = [];  // ビデオウィンドウの大きさの移動平均を計算するためのリスト
 let moveBorderAlphas: number[] = [];  // ビデオウィンドウの枠の色の透明度の移動平均を計算するためのリスト
-let isSpeaking = false;  // 発話状態か否か
-let borderAlphaValueBasedVoice = AppConstants.BORDER_ALPHA_MIN;  // 発話タイミングに基づく，枠の色の透明度変化を表す値
+// let isSpeaking = false;  // 発話状態か否か
+// let borderAlphaValueBasedVoice = AppConstants.BORDER_ALPHA_MIN;  // 発話タイミングに基づく，枠の色の透明度変化を表す値
 
 // --- Component Logic ---
 export const MainContent = () => {
   // --- States ---
-  const [ me, setMe ] = useState<LocalP2PRoomMember>();  // 自分自身の参加者情報
+  const [ me, setMe ] = useState<LocalRoomMember>();  // 自分自身の参加者情報
   const [ roomName, setRoomName ] = useState("");  // ルーム名
   const [ localStream, setLocalStream ] = useState<{
     audio: LocalAudioStream;
     video: LocalVideoStream;
   }>();  // ローカルストリーム
   const [ localDataStream, setLocalDataStream ] = useState<LocalDataStream>();  // ローカル側のデータストリーム
-  const [ otherUserDataStream, setOtherUserDataStream ] = useState<RemoteDataStream>();  // リモート側のデータストリーム
-  const [ otherUserPublications, setOtherUserPublications ] = useState<RoomPublication<LocalStream>[]>([]);  // 会話相手の公開ストリーム
-  const [ devices, setDevices ] = React.useState<MediaDeviceInfo[]>([]);  // 
+  const [ otherUserDataStreams, setOtherUserDataStreams ] = useState<Map<string, RemoteDataStream>>( new Map() );  // リモート側のデータストリーム
+  const [ otherUserPublications, setOtherUserPublications ] = useState<Map<string, RoomPublication<LocalStream>>>( new Map() );  // 会話相手の公開ストリーム
+  const [ devices, setDevices ] = React.useState<MediaDeviceInfo[]>([]);
+  const [ isSpeaking, setIsSpeaking ] = useState(false);
+  const [ borderAlphaValueBasedVoice, setBorderAlphaValueBasedVoice ] = useState(AppConstants.BORDER_ALPHA_MIN);
   const [ myWindowAndAudioAndParticipantsInfo, setMyWindowAndAudioAndParticipantsInfo ] = useState<WindowAndAudioAndParticipantsInfo>({ 
     topDiff: AppConstants.DEFAULT_TOP_DIFF, leftDiff: AppConstants.DEFAULT_LEFT_DIFF, 
     width: defaultWidth, height: defaultWidth,
@@ -139,31 +141,31 @@ export const MainContent = () => {
     borderAlpha: defaultBorderColor.a, borderAlphaValueBasedVoice: borderAlphaValueBasedVoice,
     widthInCaseOfChange: 0, theta: 0, isSpeaking: false, transcript: "", gazeStatus: ""
   });  // 自分自身のウィンドウの情報
-  const [ otherUserWindowAndAudioAndParticipantsInfo, setOtherUserWindowAndAudioAndParticipantsInfo ] = useState<WindowAndAudioAndParticipantsInfo>({
-    topDiff: AppConstants.DEFAULT_TOP_DIFF, leftDiff: AppConstants.DEFAULT_LEFT_DIFF, 
-    width: defaultWidth, height: defaultWidth,
-    borderRed: defaultBorderColor.r, borderGreen: defaultBorderColor.g, borderBlue: defaultBorderColor.b, 
-    borderAlpha: defaultBorderColor.a, borderAlphaValueBasedVoice: borderAlphaValueBasedVoice,
-    widthInCaseOfChange: 0, theta: 0, isSpeaking: false, transcript: "", gazeStatus: ""
-  });  // 会話相手のウィンドウの情報
+  // const [ otherUserWindowAndAudioAndParticipantsInfo, setOtherUserWindowAndAudioAndParticipantsInfo ] = useState<WindowAndAudioAndParticipantsInfo>({
+  //   topDiff: AppConstants.DEFAULT_TOP_DIFF, leftDiff: AppConstants.DEFAULT_LEFT_DIFF, 
+  //   width: defaultWidth, height: defaultWidth,
+  //   borderRed: defaultBorderColor.r, borderGreen: defaultBorderColor.g, borderBlue: defaultBorderColor.b, 
+  //   borderAlpha: defaultBorderColor.a, borderAlphaValueBasedVoice: borderAlphaValueBasedVoice,
+  //   widthInCaseOfChange: 0, theta: 0, isSpeaking: false, transcript: "", gazeStatus: ""
+  // });  // 会話相手のウィンドウの情報
   const { 
     transcript,
     resetTranscript,
     browserSupportsSpeechRecognition
   } = useSpeechRecognition();  // 音声認識設定
-  const [ headDirectionResults, setHeadDirectionResults ] = useState<CSV_HeadDirection_Info[]>([]);
+  const [ headDirectionResults, setHeadDirectionResults ] = useState<CSV_HeadDirection_Info[]>([]);  // 収集データ
   const [ startTime_HeadDirection, setStartTime_HeadDirection ] = useState<number>(0);  // ウィンドウ情報収集開始時間
   const [ nowTest, setNowTest ] = useState<boolean>(false);  // ウィンドウ情報収集中か否か
 
   // --- Refs ---
-  const localVideo = useRef<HTMLVideoElement>(null);
+  const localVideoRef = useRef<HTMLVideoElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserNodeRef = useRef<AnalyserNode | null>(null);
   const dataArrayRef = useRef<Uint8Array | null>(null);
   const audtioInputGainNodeRef = useRef<GainNode | null>(null);  // オプション: マイク入力のゲイン調整用
   const webcamRef = useRef<Webcam>(null);  // Webcamの参照
   const resultsRef = useRef<Results>();  // MediaPipeの検出結果を格納するための参照
-  const CSV_Ref = useRef<CSVLink & HTMLAnchorElement & { link: HTMLAnchorElement }>(null);  // CSVファイルのリンクを格納するための参照
+  const CSVRef = useRef<CSVLink & HTMLAnchorElement & { link: HTMLAnchorElement }>(null);  // CSVファイルのリンクを格納するための参照
 
   // --- Memos ---
   const appId = useMemo(() => process.env.REACT_APP_SKYWAY_APP_ID, []);  // SkyWayのアプリID
@@ -221,23 +223,23 @@ export const MainContent = () => {
     width: AppConstants.DEFAULT_MY_WINDOW_WIDTH,
     border: `10px solid rgba(${myWindowAndAudioAndParticipantsInfo.borderRed}, ${myWindowAndAudioAndParticipantsInfo.borderGreen}, ${myWindowAndAudioAndParticipantsInfo.borderBlue}, ${myWindowAndAudioAndParticipantsInfo.borderAlphaValueBasedVoice})`,
   }), [ myWindowAndAudioAndParticipantsInfo ]);  // 参加者側のビデオウィンドウのスタイル
-  const otherUserWindowAndAudioContainerStyle = useMemo<React.CSSProperties>(() => ({
-    position: "absolute",
-    top: // 画面の上側にはみ出る場合には，画面上端に位置調整
-         0 + window.screen.height / 2 - otherUserWindowAndAudioAndParticipantsInfo.height / 2 + otherUserWindowAndAudioAndParticipantsInfo.topDiff < 0 ? 0 :
-         // 画面の下側にはみ出る場合には，画面下端に位置調整
-         0 + window.screen.height / 2 - otherUserWindowAndAudioAndParticipantsInfo.height / 2 + otherUserWindowAndAudioAndParticipantsInfo.topDiff 
-         > 0 + window.screen.height - otherUserWindowAndAudioAndParticipantsInfo.height ? 0 + window.screen.height - otherUserWindowAndAudioAndParticipantsInfo.height :
-         // 画面内に収まるなら，その位置に配置
-         0 + window.screen.height / 2 - otherUserWindowAndAudioAndParticipantsInfo.height / 2 + otherUserWindowAndAudioAndParticipantsInfo.topDiff,
-    left: // 画面の左側にはみ出る場合には，画面左端に位置調整
-          window.screenLeft + scrollMyX + window.screen.width / 2 - otherUserWindowAndAudioAndParticipantsInfo.width / 2 + otherUserWindowAndAudioAndParticipantsInfo.leftDiff < 0 ? 0 :
-          window.screenLeft + scrollMyX + window.screen.width / 2 - otherUserWindowAndAudioAndParticipantsInfo.width / 2 + otherUserWindowAndAudioAndParticipantsInfo.leftDiff
-          > window.screenLeft + scrollMyX + window.screen.width - otherUserWindowAndAudioAndParticipantsInfo.width ? window.screenLeft + scrollMyX + window.screen.width - otherUserWindowAndAudioAndParticipantsInfo.width : 
-          window.screenLeft + scrollMyX + window.screen.width / 2 - otherUserWindowAndAudioAndParticipantsInfo.width / 2 + otherUserWindowAndAudioAndParticipantsInfo.leftDiff,
-    width: otherUserWindowAndAudioAndParticipantsInfo.width,
-    border: `10px solid rgba(${otherUserWindowAndAudioAndParticipantsInfo.borderRed}, ${otherUserWindowAndAudioAndParticipantsInfo.borderGreen}, ${otherUserWindowAndAudioAndParticipantsInfo.borderBlue}, ${otherUserWindowAndAudioAndParticipantsInfo.borderAlpha})`
-  }), [ otherUserWindowAndAudioAndParticipantsInfo ]);  // 会話相手側のビデオウィンドウのスタイル
+  // const otherUserWindowAndAudioContainerStyle = useMemo<React.CSSProperties>(() => ({
+  //   position: "absolute",
+  //   top: // 画面の上側にはみ出る場合には，画面上端に位置調整
+  //        0 + window.screen.height / 2 - otherUserWindowAndAudioAndParticipantsInfo.height / 2 + otherUserWindowAndAudioAndParticipantsInfo.topDiff < 0 ? 0 :
+  //        // 画面の下側にはみ出る場合には，画面下端に位置調整
+  //        0 + window.screen.height / 2 - otherUserWindowAndAudioAndParticipantsInfo.height / 2 + otherUserWindowAndAudioAndParticipantsInfo.topDiff 
+  //        > 0 + window.screen.height - otherUserWindowAndAudioAndParticipantsInfo.height ? 0 + window.screen.height - otherUserWindowAndAudioAndParticipantsInfo.height :
+  //        // 画面内に収まるなら，その位置に配置
+  //        0 + window.screen.height / 2 - otherUserWindowAndAudioAndParticipantsInfo.height / 2 + otherUserWindowAndAudioAndParticipantsInfo.topDiff,
+  //   left: // 画面の左側にはみ出る場合には，画面左端に位置調整
+  //         window.screenLeft + scrollMyX + window.screen.width / 2 - otherUserWindowAndAudioAndParticipantsInfo.width / 2 + otherUserWindowAndAudioAndParticipantsInfo.leftDiff < 0 ? 0 :
+  //         window.screenLeft + scrollMyX + window.screen.width / 2 - otherUserWindowAndAudioAndParticipantsInfo.width / 2 + otherUserWindowAndAudioAndParticipantsInfo.leftDiff
+  //         > window.screenLeft + scrollMyX + window.screen.width - otherUserWindowAndAudioAndParticipantsInfo.width ? window.screenLeft + scrollMyX + window.screen.width - otherUserWindowAndAudioAndParticipantsInfo.width : 
+  //         window.screenLeft + scrollMyX + window.screen.width / 2 - otherUserWindowAndAudioAndParticipantsInfo.width / 2 + otherUserWindowAndAudioAndParticipantsInfo.leftDiff,
+  //   width: otherUserWindowAndAudioAndParticipantsInfo.width,
+  //   border: `10px solid rgba(${otherUserWindowAndAudioAndParticipantsInfo.borderRed}, ${otherUserWindowAndAudioAndParticipantsInfo.borderGreen}, ${otherUserWindowAndAudioAndParticipantsInfo.borderBlue}, ${otherUserWindowAndAudioAndParticipantsInfo.borderAlpha})`
+  // }), [ otherUserWindowAndAudioAndParticipantsInfo ]);  // 会話相手側のビデオウィンドウのスタイル
   const canJoin = useMemo(() => {
     return (
       participantID !== -1 && 
@@ -261,7 +263,7 @@ export const MainContent = () => {
       // ルームを取得、または新規作成
       const context = await SkyWayContext.Create(token);
       const room = await SkyWayRoom.FindOrCreate(context, {
-        type: 'p2p',
+        type: 'sfu',  // 3人以上の会議用に，p2p → sfuに変更
         name: roomName,
       });
       const me = await room.join();
@@ -276,14 +278,16 @@ export const MainContent = () => {
         await me.publish(localDataStream);
       }
 
-      // 自分以外の参加者情報を取得
-      const otherPublifications = room.publications.filter(p => p.publisher.id !== me.id);
-      setOtherUserPublications(otherPublifications);
-      for (let i = 0; i < otherPublifications.length; i++) {
-        if (otherPublifications[i].contentType === "data") {
-          const { stream } = await me.subscribe(otherPublifications[i].id);
-          if (stream.contentType === "data") {
-            setOtherUserDataStream(stream);
+      // 既存の参加者情報をすべて取得
+      const otherPublifications = new Map<string, RoomPublication<LocalStream>>();
+      for (const publication of room.publications) {
+        if (publication.publisher.id !== me.id) {
+          otherPublifications.set(publication.publisher.id, publication);
+          if (publication.contentType === "data") {
+            const { stream } = await me.subscribe(publication.id);
+            if (stream.contentType === "data") {
+              setOtherUserDataStreams(prev => new Map(prev).set(publication.publisher.id, stream as RemoteDataStream));
+            }
           }
         }
       }
@@ -291,17 +295,60 @@ export const MainContent = () => {
       // その後に参加してきた人の情報を取得
       room.onStreamPublished.add(async (e) => {
         if (e.publication.publisher.id !== me.id) {
-          setOtherUserPublications(pre => [ ...pre, e.publication ]);
+          setOtherUserPublications(prev => new Map(prev).set(e.publication.publisher.id, e.publication));
+          if (e.publication.contentType === "data") {
+            const { stream } = await me.subscribe(e.publication.id);
+            if (stream.contentType === "data") {
+              setOtherUserDataStreams(prev => new Map(prev).set(e.publication.publisher.id, stream as RemoteDataStream));
+              // eslint-disable-next-line
+              console.log(`${e.publication.id}のDataStreamにセットしました！`);
+            }
+          }
         }
+      });
 
-        if (e.publication.contentType === "data" && e.publication.publisher.id !== me.id) {
-          const { stream } = await me.subscribe(e.publication.id);
-          if (stream.contentType === "data") {
-            setOtherUserDataStream(stream);
-            // eslint-disable-next-line
-            console.log("DataStreamにセットしました！");  // デバッグ用
-          }  // ここは必ずRemoteDataStreamになるはず
-        }
+      // 既存の参加者情報をすべて取得
+      // const otherPublifications = room.publications.filter(p => p.publisher.id !== me.id);
+      // setOtherUserPublications(otherPublifications);
+      // for (let i = 0; i < otherPublifications.length; i++) {
+      //   if (otherPublifications[i].contentType === "data") {
+      //     const { stream } = await me.subscribe(otherPublifications[i].id);
+      //     if (stream.contentType === "data") {
+      //       setOtherUserDataStreams(stream);
+      //     }
+      //   }
+      // }
+
+      // その後に参加してきた人の情報を取得
+      // room.onStreamPublished.add(async (e) => {
+      //   if (e.publication.publisher.id !== me.id) {
+      //     setOtherUserPublications(pre => [ ...pre, e.publication ]);
+      //   }
+
+      //   if (e.publication.contentType === "data" && e.publication.publisher.id !== me.id) {
+      //     const { stream } = await me.subscribe(e.publication.id);
+      //     if (stream.contentType === "data") {
+      //       setOtherUserDataStreams(stream);
+      //       // eslint-disable-next-line
+      //       console.log("DataStreamにセットしました！");  // デバッグ用
+      //     }  // ここは必ずRemoteDataStreamになるはず
+      //   }
+      // });
+
+      // 参加者退室時の処理
+      room.onMemberLeft.add((e) => {
+        // eslint-disable-next-line
+        console.log(`${e.member.id}が退室しました`);
+        setOtherUserPublications(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(e.member.id);
+          return newMap;
+        });
+        setOtherUserDataStreams(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(e.member.id);
+          return newMap;
+        });
       });
 
       // 部屋名のみを表示させる
@@ -324,22 +371,28 @@ export const MainContent = () => {
 
     const checkAudioLevel = () => {
       analyser.getByteFrequencyData(dataArray);
+
+      // eslint-disable-next-line
+      // console.log("Audio Data Array: " + dataArray);
+
       let sum = 0;
       for (let i = 0; i < dataArray.length; i++) {
         sum += dataArray[i];
       }
       
       const averageVolume = sum / dataArray.length;  // 音量平均
+      // eslint-disable-next-line
+      // console.log("音量平均： ", averageVolume);
 
       if (averageVolume > AppConstants.VOLUME_THRESHOLD) {
         // eslint-disable-next-line
-        console.log("isSpeaking（発話開始）: ", isSpeaking);  // デバッグ用
+        // console.log("isSpeaking（発話開始）: ", isSpeaking);  // デバッグ用
         // ボリュームが閾値を超えた場合
         if (speakingTimer === null) {
           speakingTimer = setTimeout(() => {
             // 発話開始のロジック
-            isSpeaking = true;
-            borderAlphaValueBasedVoice = AppConstants.BORDER_ALPHA_MAX;  // 枠の色をつける
+            setIsSpeaking(true);
+            setBorderAlphaValueBasedVoice(AppConstants.BORDER_ALPHA_MAX);  // 枠の色をつける
             SpeechRecognition.startListening({
               continuous: false, // 連続認識を無効にする
               language: 'ja'
@@ -354,13 +407,13 @@ export const MainContent = () => {
       }
       else {
         // eslint-disable-next-line
-        console.log("isSpeaking（発話終了）: ", isSpeaking);  // デバッグ用
+        // console.log("isSpeaking（発話終了）: ", isSpeaking);  // デバッグ用
         // ボリュームが閾値を下回った場合
         if (notSpeakingTimer === null) {
           notSpeakingTimer = setTimeout(() => {
             // 発話終了のロジック
-            isSpeaking = false;
-            borderAlphaValueBasedVoice = AppConstants.BORDER_ALPHA_MIN;  // 枠の色を透明にする
+            setIsSpeaking(false);
+            setBorderAlphaValueBasedVoice(AppConstants.BORDER_ALPHA_MIN);  // 枠の色を透明にする
             SpeechRecognition.stopListening();
             resetTranscript(); // 次の発話のためにトランスクリプトをリセット
             notSpeakingTimer = null;
@@ -377,7 +430,7 @@ export const MainContent = () => {
     };
 
     requestAnimationFrame(checkAudioLevel);
-  }, [ isSpeaking ]);  // 音声レベルの監視
+  }, [ isSpeaking, resetTranscript ]);  // 音声レベルの監視
   // ビデオウィンドウのInfoの更新+音声データの追加
   const updateWindowInfo = useCallback(
     (
@@ -609,13 +662,13 @@ export const MainContent = () => {
   }, []);  // CSVファイルへのウィンドウ情報書き出し開始
   const testEnd = useCallback(() => {
     setNowTest(false);
-    CSV_Ref?.current?.link.click();
+    CSVRef?.current?.link.click();
   }, []);  // CSVファイルへのウィンドウ情報書き出し終了 & CSV保存
 
   // --- Effects ---
   useEffect(() => {
     const initialize = async () => {
-      if (token == null || localVideo.current == null) return;
+      if (token == null || localVideoRef.current == null) return;
 
       // カメラの種類の選択
       navigator.mediaDevices.getUserMedia({
@@ -631,8 +684,19 @@ export const MainContent = () => {
 
       if(localStream == null) {
         const stream = await SkyWayStreamFactory.createMicrophoneAudioAndCameraStream();
-        stream.video.attach(localVideo.current);
+        stream.video.attach(localVideoRef.current);
         setLocalStream(stream);
+
+         // ここで音声トラックの詳細を確認
+         const audioTrack = stream.audio.track;  // デバッグ用
+         // eslint-disable-next-line
+         console.log("Audio Track ID:", audioTrack.id);  // デバッグ用
+         // eslint-disable-next-line
+         console.log("Audio Track Muted:", audioTrack.muted);  // デバッグ用
+         // eslint-disable-next-line
+         console.log("Audio Track ReadyState:", audioTrack.readyState);  // デバッグ用
+         // eslint-disable-next-line
+         console.log("Audio Track Settings:", audioTrack.getSettings());  // デバッグ用
 
         // AudtioContextとAnalyserNodeの初期化
         audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -650,9 +714,16 @@ export const MainContent = () => {
         audtioInputGainNodeRef.current = audioContextRef.current.createGain();
         audtioInputGainNodeRef.current.gain.value = 1.0;  // デフォルトゲイン
 
+        // eslint-disable-next-line
+        console.log("Source Tracks: ", audioMediaStream.getAudioTracks());
+
         // AudioNodeの接続
         source.connect(audtioInputGainNodeRef.current);
         audtioInputGainNodeRef.current.connect(analyserNodeRef.current);
+
+        // eslint-disable-next-line
+        console.log("Gain: ", audtioInputGainNodeRef.current.gain.value);  // デバッグ用
+        console.log("AudioState: ", audioContextRef.current.state);  // デバッグ用
 
         // 音声レベル監視を開始
         startAudioLevelMonitoring();
@@ -660,7 +731,7 @@ export const MainContent = () => {
 
       const dataStream = await SkyWayStreamFactory.createDataStream();
 
-      await localVideo.current.play();
+      await localVideoRef.current.play();
       setLocalDataStream(dataStream);
     };
     
@@ -674,7 +745,7 @@ export const MainContent = () => {
         audioContextRef.current.close();
       }
     }
-  }, [ token, localVideo ]);  // ビデオの初期設定（tokenとvideo要素の参照ができたら実行）
+  }, [ token, localVideoRef, localStream, startAudioLevelMonitoring ]);  // ビデオの初期設定（tokenとvideo要素の参照ができたら実行）
   useEffect(() => {
     if (!browserSupportsSpeechRecognition) {
       // eslint-disable-next-line
@@ -687,16 +758,16 @@ export const MainContent = () => {
       // eslint-disable-next-line
       console.log("自分のデータを送信しました！");  // デバッグ用
     }
-  }, [ myWindowAndAudioAndParticipantsInfo ]);  // 自分自身のウィンドウ情報の送信
-  useEffect(() => {
-    if (otherUserDataStream != null) {
-      otherUserDataStream.onData.add((args) => {
-        setOtherUserWindowAndAudioAndParticipantsInfo(args as WindowAndAudioAndParticipantsInfo);
-        // eslint-disable-next-line
-        console.log("相手のデータを受信しました！");  // デバッグ用
-      });
-    }
-  }, [ otherUserDataStream ]);  // 会話相手のウィンドウ情報の受信
+  }, [ myWindowAndAudioAndParticipantsInfo, localDataStream ]);  // 自分自身のウィンドウ情報の送信
+  // useEffect(() => {
+  //   if (otherUserDataStreams != null) {
+  //     otherUserDataStreams.onData.add((args) => {
+  //       setOtherUserWindowAndAudioAndParticipantsInfo(args as WindowAndAudioAndParticipantsInfo);
+  //       // eslint-disable-next-line
+  //       console.log("相手のデータを受信しました！");  // デバッグ用
+  //     });
+  //   }
+  // }, [ otherUserDataStreams ]);  // 会話相手のウィンドウ情報の受信
   useEffect(() => {
     // MediaPipe側の初期設定
     const faceMesh = new FaceMesh({
@@ -713,7 +784,7 @@ export const MainContent = () => {
     faceMesh.onResults(onResults);
 
     // MediaPipeの顔検出用のカメラ検出
-    if (localVideo.current && webcamRef.current?.video) {
+    if (localVideoRef.current && webcamRef.current?.video) {
       const camera = new Camera(webcamRef.current!.video!, {
         onFrame: async () => {
           await faceMesh.send({ image: webcamRef.current!.video! })
@@ -727,25 +798,53 @@ export const MainContent = () => {
     }
   }, [ onResults ]);  // MediaPipeの顔検出の準備
   useEffect(() => {
-      if (otherUserDataStream != null) {
+      if (otherUserDataStreams != null) {
         if (nowTest) {
+          // 自分自身のウィンドウ情報を追加
           const nowTime_HeadDirection = (performance.now() - startTime) / 1000;
+          const currentEntry: CSV_HeadDirection_Info = {
+            ID: participantID, condition: conditionID,
+            startTime: startTime_HeadDirection, endTime: nowTime_HeadDirection,
+            myTheta: myWindowAndAudioAndParticipantsInfo.theta, myDirection: Utils.getParticipantDirection(myWindowAndAudioAndParticipantsInfo.theta),
+            myWindowWidth: myWindowAndAudioAndParticipantsInfo.widthInCaseOfChange, myStatusGaze: myWindowAndAudioAndParticipantsInfo.gazeStatus,
+            myIsSpeaking: myWindowAndAudioAndParticipantsInfo.isSpeaking, myTranscript: myWindowAndAudioAndParticipantsInfo.transcript,
+          }
+
+          // 各リモートユーザのデータを追加
+          let userIndex = 1;
+          otherUserDataStreams.forEach((stream, memberID) => {
+            const remoteUserLatestInfo = (stream as any)._latestData as WindowAndAudioAndParticipantsInfo | undefined;  // _latestDataは内部プロパティ
+            if (remoteUserLatestInfo) {
+              currentEntry[`otherUser${userIndex}_ID`] = memberID;
+              currentEntry[`otherUser${userIndex}_Theta`] = remoteUserLatestInfo.theta;
+              currentEntry[`otherUser${userIndex}_Direction`] = Utils.getParticipantDirection(remoteUserLatestInfo.theta);
+              currentEntry[`otherUser${userIndex}WindowWidth`] = remoteUserLatestInfo.widthInCaseOfChange;
+              currentEntry[`otherUser${userIndex}StatusGaze`] = remoteUserLatestInfo.gazeStatus;
+              currentEntry[`otherUser${userIndex}IsSpeaking`] = remoteUserLatestInfo.isSpeaking;
+              currentEntry[`otherUser${userIndex}Transcript`] = remoteUserLatestInfo.transcript;
+            }
+            userIndex++;
+          })
           setHeadDirectionResults((prev) => [
             ...prev,
-            { ID: participantID, condition: conditionID, 
-              startTime: startTime_HeadDirection, endTime: nowTime_HeadDirection, 
-              myTheta: myWindowAndAudioAndParticipantsInfo.theta, myDirection: Utils.getParticipantDirection(myWindowAndAudioAndParticipantsInfo.theta),
-              myWindowWidth: myWindowAndAudioAndParticipantsInfo.widthInCaseOfChange, myStatusGaze: myWindowAndAudioAndParticipantsInfo.gazeStatus,
-              myIsSpeaking: myWindowAndAudioAndParticipantsInfo.isSpeaking, myTranscript: myWindowAndAudioAndParticipantsInfo.transcript,
-              otherTheta: otherUserWindowAndAudioAndParticipantsInfo.theta, otherDirection: Utils.getParticipantDirection(otherUserWindowAndAudioAndParticipantsInfo.theta),
-              otherWindowWidth: otherUserWindowAndAudioAndParticipantsInfo.widthInCaseOfChange, otherStatusGaze: otherUserWindowAndAudioAndParticipantsInfo.gazeStatus,
-              otherIsSpeaking: otherUserWindowAndAudioAndParticipantsInfo.isSpeaking, otherTranscript: otherUserWindowAndAudioAndParticipantsInfo.transcript
-            }
+            currentEntry
           ]);
-          setStartTime_HeadDirection(nowTime_HeadDirection);
+          // setHeadDirectionResults((prev) => [
+          //   ...prev,
+          //   { ID: participantID, condition: conditionID, 
+          //     startTime: startTime_HeadDirection, endTime: nowTime_HeadDirection, 
+          //     myTheta: myWindowAndAudioAndParticipantsInfo.theta, myDirection: Utils.getParticipantDirection(myWindowAndAudioAndParticipantsInfo.theta),
+          //     myWindowWidth: myWindowAndAudioAndParticipantsInfo.widthInCaseOfChange, myStatusGaze: myWindowAndAudioAndParticipantsInfo.gazeStatus,
+          //     myIsSpeaking: myWindowAndAudioAndParticipantsInfo.isSpeaking, myTranscript: myWindowAndAudioAndParticipantsInfo.transcript,
+          //     otherTheta: otherUserWindowAndAudioAndParticipantsInfo.theta, otherDirection: Utils.getParticipantDirection(otherUserWindowAndAudioAndParticipantsInfo.theta),
+          //     otherWindowWidth: otherUserWindowAndAudioAndParticipantsInfo.widthInCaseOfChange, otherStatusGaze: otherUserWindowAndAudioAndParticipantsInfo.gazeStatus,
+          //     otherIsSpeaking: otherUserWindowAndAudioAndParticipantsInfo.isSpeaking, otherTranscript: otherUserWindowAndAudioAndParticipantsInfo.transcript
+          //   }
+          // ]);
+          setStartTime_HeadDirection(nowTime_HeadDirection);  // 計測開始時間を更新
         }
       }
-  }, [ otherUserWindowAndAudioAndParticipantsInfo ]);  // CSVファイルへの頭部方向・音声データの書き出し
+  }, [ nowTest, startTime_HeadDirection, myWindowAndAudioAndParticipantsInfo, otherUserDataStreams ]);  // CSVファイルへの頭部方向・音声データの書き出し
   
   // --- render ---
   return (
@@ -808,8 +907,8 @@ export const MainContent = () => {
           <option value="1">Baseline</option>
           <option value="2">FrameChange</option>
           <option value="3">SizeChange</option>
-          <option value="4">SizeChange_Discrete</option>    
-          {/* <option value="5">PositionChange</option> */}          
+          <option value="4">SizeChange_Discrete</option>
+          {/* <option value="5">PositionChange</option> */}
           {/* <option value="6">PositionAndSizeChange</option> */}
         </select>
         &nbsp;&nbsp;
@@ -825,21 +924,33 @@ export const MainContent = () => {
         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
         <button onClick={testEnd} disabled={!nowTest}>Measurement End</button>
       </div>
-      <CSVLink data={headDirectionResults} filename={`C${conditionID}_ID${participantID}_headDirectionResults.csv`} ref={CSV_Ref} ></CSVLink>
+      <CSVLink data={headDirectionResults} filename={`C${conditionID}_ID${participantID}_headDirectionResults.csv`} ref={CSVRef} ></CSVLink>
       {/* <div>
         <p>トランスクリプト：{transcript}</p>
       </div> */}
-        <div className="icon-container">
+      <div className="icon-container">
         {
-          me != null && otherUserPublications.map(p => (
-            <RemoteMedia id="remote-video" key={p.id} me={me} publication={p} style={otherUserWindowAndAudioContainerStyle}/>
-          ))
+          // me != null && otherUserPublications.map(p => (
+          //   <RemoteMedia id="remote-video" key={p.id} me={me} publication={p} style={otherUserWindowAndAudioContainerStyle}/>
+          // ))
+          me != null && Array.from(otherUserPublications.entries()).map(([memberID, publication]) => {
+            const remoteDataStream = otherUserDataStreams.get(memberID);
+            return (
+              <RemoteMedia
+                id={`remote-video-${memberID}`}
+                key={memberID}
+                me={me!}
+                publication={publication}
+                remoteDataStream={remoteDataStream}
+              />
+            );
+          })
         }
         <div className="icon-container">
-          <video id="local-video" ref={localVideo} muted playsInline style={myWindowAndAudioContainerStyle}></video>
+          <video id="local-video" ref={localVideoRef} muted playsInline style={myWindowAndAudioContainerStyle}></video>
           <Webcam id="local-video-webcam" ref={webcamRef} videoConstraints={{ deviceId: devices?.[0]?.deviceId }} muted playsInline style={myWindowAndAudioContainerStyle}/>
         </div>
-        </div>
+      </div>
     </div>
   )
 }
