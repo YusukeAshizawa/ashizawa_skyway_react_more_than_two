@@ -1,15 +1,15 @@
 {
   "files": {
-    "main.css": "/ashizawa_skyway_react/static/css/main.b36d379c.css",
-    "main.js": "/ashizawa_skyway_react/static/js/main.8912e5f6.js",
-    "static/js/453.bb956aef.chunk.js": "/ashizawa_skyway_react/static/js/453.bb956aef.chunk.js",
+    "main.css": "/ashizawa_skyway_react/static/css/main.ce31ba91.css",
+    "main.js": "/ashizawa_skyway_react/static/js/main.f217a618.js",
+    "static/js/453.eeffa7f9.chunk.js": "/ashizawa_skyway_react/static/js/453.eeffa7f9.chunk.js",
     "index.html": "/ashizawa_skyway_react/index.html",
-    "main.b36d379c.css.map": "/ashizawa_skyway_react/static/css/main.b36d379c.css.map",
-    "main.8912e5f6.js.map": "/ashizawa_skyway_react/static/js/main.8912e5f6.js.map",
-    "453.bb956aef.chunk.js.map": "/ashizawa_skyway_react/static/js/453.bb956aef.chunk.js.map"
+    "main.ce31ba91.css.map": "/ashizawa_skyway_react/static/css/main.ce31ba91.css.map",
+    "main.f217a618.js.map": "/ashizawa_skyway_react/static/js/main.f217a618.js.map",
+    "453.eeffa7f9.chunk.js.map": "/ashizawa_skyway_react/static/js/453.eeffa7f9.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.b36d379c.css",
-    "static/js/main.8912e5f6.js"
+    "static/css/main.ce31ba91.css",
+    "static/js/main.f217a618.js"
   ]
 }
