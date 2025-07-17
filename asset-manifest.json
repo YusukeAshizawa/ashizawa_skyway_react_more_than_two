@@ -1,15 +1,15 @@
 {
   "files": {
-    "main.css": "/ashizawa_skyway_react/static/css/main.ce31ba91.css",
-    "main.js": "/ashizawa_skyway_react/static/js/main.f217a618.js",
-    "static/js/453.eeffa7f9.chunk.js": "/ashizawa_skyway_react/static/js/453.eeffa7f9.chunk.js",
-    "index.html": "/ashizawa_skyway_react/index.html",
-    "main.ce31ba91.css.map": "/ashizawa_skyway_react/static/css/main.ce31ba91.css.map",
-    "main.f217a618.js.map": "/ashizawa_skyway_react/static/js/main.f217a618.js.map",
-    "453.eeffa7f9.chunk.js.map": "/ashizawa_skyway_react/static/js/453.eeffa7f9.chunk.js.map"
+    "main.css": "/ashizawa_skyway_react_more_than_two/static/css/main.ce31ba91.css",
+    "main.js": "/ashizawa_skyway_react_more_than_two/static/js/main.a64899f6.js",
+    "static/js/453.eeffa7f9.chunk.js": "/ashizawa_skyway_react_more_than_two/static/js/453.eeffa7f9.chunk.js",
+    "index.html": "/ashizawa_skyway_react_more_than_two/index.html",
+    "main.ce31ba91.css.map": "/ashizawa_skyway_react_more_than_two/static/css/main.ce31ba91.css.map",
+    "main.a64899f6.js.map": "/ashizawa_skyway_react_more_than_two/static/js/main.a64899f6.js.map",
+    "453.eeffa7f9.chunk.js.map": "/ashizawa_skyway_react_more_than_two/static/js/453.eeffa7f9.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.ce31ba91.css",
-    "static/js/main.f217a618.js"
+    "static/js/main.a64899f6.js"
   ]
 }
